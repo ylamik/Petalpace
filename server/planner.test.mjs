@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { createAuthStore } from './auth-store.mjs'
 import { createAuthHandler } from './auth.mjs'
 import { validatePlanner } from './planner.mjs'
-const task=(changes={})=>({id:'task-1',title:'Read notes',space:'School',priority:'Medium',dueDate:'',notes:'',steps:[],completedSteps:[],files:[],links:[],pinned:false,done:false,...changes})
+const task=(changes={})=>({id:'task-1',title:changes.id?`Read notes ${changes.id}`:'Read notes',space:'School',priority:'Medium',dueDate:'',notes:'',steps:[],completedSteps:[],files:[],links:[],pinned:false,done:false,...changes})
 async function fixture(t,path=':memory:',cleanup=()=>{}){
   const db=createAuthStore(path);let clock=Date.UTC(2026,10,1,12)
   const tokens=['a'.repeat(64),'b'.repeat(64)]
@@ -281,4 +281,11 @@ test('quota uses final raw bytes; restore and purge free storage without double 
   const grow=await f.request({...state,revision:2,tasks:[task({id:'new1',files:[file(10)]}),task({id:'new2',files:[file(10)]}),task({id:'new3',files:[file(10)]})]})
   assert.equal(grow.status,400)
   assert.equal((await f.request()).body.revision,2)
+})
+
+test('duplicate core task fields are rejected but a different deadline is allowed',async t=>{
+ const f=await fixture(t);const state=(await f.request()).body
+ const first=task({dueDate:'2026-11-03',dueZone:'Asia/Manila'})
+ assert.equal((await f.request({...state,tasks:[first,{...first,id:'second',title:' READ NOTES '}]})).status,400)
+ assert.equal((await f.request({...state,tasks:[first,{...first,id:'second',dueDate:'2026-11-04'}]})).status,200)
 })

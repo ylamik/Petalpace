@@ -1,4 +1,6 @@
+import { deadlineInstant, validZone, taskIdentity } from '../src/features/tasks/deadlineZone.ts'
 import { isOfficePackage } from './document-format.mjs'
+import { notifyPlannerChanged } from './sse-broker.mjs'
 const defaults = [{id:'school',name:'School',color:'#D7E7FD'},{id:'personal',name:'Personal',color:'#FDDCCD'},{id:'creative',name:'Creative',color:'#D6DDC9'}]
 const fail = message => { throw Object.assign(new Error(message),{status:400}) }
 const text = (s,n) => typeof s==='string' && [...s].length<=n
@@ -13,7 +15,7 @@ const fileSignatures = {
   doc:  [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1],               // OLE2 compound
   ppt:  [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1],               // OLE2 compound
 }
-function checkFileSignature(buffer, name) {
+export function checkFileSignature(buffer, name) {
   const ext = name.toLowerCase().split('.').pop()
   const sig = fileSignatures[ext]
   if (!sig) return false
@@ -31,6 +33,8 @@ export function validatePlanner(data) {
   const tasks=data.tasks.map(t=>{
     if(!t || !text(t.id,100) || !t.id || taskIds.has(t.id) || !text(t.title,160) || !t.title.trim() || !['High','Medium','Low'].includes(t.priority) || !text(t.notes,20000) || !text(t.dueDate,10) || !dateOK(t.dueDate)) fail('Check the task title, priority, notes, and due date.')
     if(t.dueTime!==undefined && (typeof t.dueTime!=='string' || (t.dueTime!=='' && (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t.dueTime) || !t.dueDate)))) fail('Choose a valid due date and time.')
+    if(t.dueZone !== undefined && !validZone(t.dueZone)) fail('Choose a valid deadline timezone.')
+    if(t.dueDate && t.dueZone && deadlineInstant(t.dueDate,t.dueTime,t.dueZone)===null) fail('This local deadline does not exist because the clocks change. Choose another time.')
     taskIds.add(t.id)
     const space=spaces.find(s=>s.name===t.space)
     if(!space) fail('Select an existing space for each task.')
@@ -46,7 +50,7 @@ export function validatePlanner(data) {
       if(size>10*1024*1024 || bytes>30*1024*1024) fail('Attachments must be at most 10 MB each and 30 MB total per account.')
       return {name:f.name,type:f.type,lastModified:Number.isFinite(f.lastModified)?f.lastModified:0,data:f.data}
     })
-    return {id:t.id,title:t.title.trim(),spaceId:space.id,space:space.name,priority:t.priority,dueDate:t.dueDate,dueTime:t.dueTime??'',notes:t.notes,steps:t.steps,completedSteps:[...new Set(t.completedSteps)],files,links:[...new Set(t.links)],pinned:t.pinned,done:t.done,started:!t.done && !t.blocked && !!t.started,blocked:!t.done && !!t.blocked}
+    return {id:t.id,title:t.title.trim(),spaceId:space.id,space:space.name,priority:t.priority,dueDate:t.dueDate,dueTime:t.dueTime??'',...(t.dueZone?{dueZone:t.dueZone}:{}),notes:t.notes,steps:t.steps,completedSteps:[...new Set(t.completedSteps)],files,links:[...new Set(t.links)],pinned:t.pinned,done:t.done,started:!t.done && !t.blocked && !!t.started,blocked:!t.done && !!t.blocked}
   })
   if(tasks.filter(t=>t.pinned&&!t.done).length>3) fail('Your top 3 is full. Unpin one task first.')
   return {spaces,tasks}
@@ -65,9 +69,18 @@ export function createPlannerHandler({db,findSession,origins,limit,now=Date.now}
       const user=findSession(req)
       if(!user) return reply(401,{error:'Please sign in again.'})
       purge()
+      if(req.url==='/api/auth/planner/version' && req.method==='GET')return reply(200,{revision:db.prepare('SELECT revision FROM planners WHERE user_id=?').get(user.id)?.revision ?? 0})
       if(req.method==='GET') {
         const row=db.prepare('SELECT revision,data FROM planners WHERE user_id=?').get(user.id)
         return reply(200,{revision:row?.revision??0,...(row?JSON.parse(row.data):{spaces:defaults,tasks:[]}),activity:activity(user.id),trash:trash(user.id),binVersion:1})
+      }
+      // DELETE /api/auth/planner/activity — resets completion history to zero
+      if(req.method==='DELETE') {
+        if(!origins.includes(req.headers.origin)) return reply(403,{error:'Please use the Petalpace website.'})
+        db.prepare('DELETE FROM completions WHERE user_id=?').run(user.id)
+        db.prepare('UPDATE planners SET revision=revision+1 WHERE user_id=?').run(user.id)
+        notifyPlannerChanged(user.id)
+        return reply(200,{activity:[],message:'Activity history cleared.'})
       }
       if(req.method!=='PUT') return reply(405,{error:'Use GET or PUT.'})
       if(!origins.includes(req.headers.origin)) return reply(403,{error:'Please use the Petalpace website.'})
@@ -99,6 +112,13 @@ export function createPlannerHandler({db,findSession,origins,limit,now=Date.now}
           return stored
         }):task?.files})):data.tasks}
         const snapshot=validatePlanner(hydrated)
+        const identities=new Map()
+        for(const task of snapshot.tasks){
+          const identity=taskIdentity(task)
+          const other=identities.get(identity)
+          if(other && (!old.some(t=>t.id===task.id && taskIdentity(t)===identity) || !old.some(t=>t.id===other && taskIdentity(t)===identity))) fail('A task with this title, space, priority and deadline already exists. Change one of these fields.')
+          identities.set(identity,task.id)
+        }
         const activeIds=new Set(snapshot.tasks.map(task=>task.id))
         const purgeSet=new Set(purgeIds)
         const removed=old.filter(task=>!activeIds.has(task.id))
@@ -128,6 +148,8 @@ export function createPlannerHandler({db,findSession,origins,limit,now=Date.now}
         db.prepare('INSERT INTO planners(user_id,revision,data) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET revision=excluded.revision,data=excluded.data').run(user.id,data.revision+1,JSON.stringify(snapshot))
         db.exec('COMMIT')
       }catch(error){db.exec('ROLLBACK');throw error}
+      // Notify all other open tabs/devices for this user that the planner changed
+      notifyPlannerChanged(user.id)
       return reply(200,{revision:data.revision+1,activity:activity(user.id),trash:trash(user.id),binVersion:1})
     }catch(error){return reply(error.status||500,{error:error.status?error.message:'Could not save your planner. Please try again.'})}
   }

@@ -1,3 +1,4 @@
+import { taskIdentity, deadlineInstant } from '../deadlineZone'
 import TimePicker from './TimePicker'
 import PlannerSelect from '../../../components/ui/PlannerSelect'
 import TaskSpaceSelect from './TaskSpaceSelect'
@@ -13,7 +14,7 @@ import { getStatus, statusChange } from './taskPresentation'
 import { useEffect, useRef, useState } from 'react'
 import type { TaskDraft } from './AddTaskDialog'
 
-type DetailTask = Pick<TaskDraft, 'title' | 'space' | 'priority' | 'pinned'> & Partial<Pick<TaskDraft, 'notes' | 'dueDate' | 'dueTime' | 'steps' | 'files' | 'links'>> & {
+type DetailTask = Pick<TaskDraft, 'title' | 'space' | 'priority' | 'pinned'> & Partial<Pick<TaskDraft, 'notes' | 'dueDate' | 'dueTime' | 'dueZone' | 'steps' | 'files' | 'links'>> & {
   done: boolean
   blocked?: boolean
   started?: boolean
@@ -40,7 +41,7 @@ function FileDownload({ file }: { file: File }) {
 }
 
 export default function TaskDetailsPanel({ task: originalTask, onChange: commitChanges, onClose, onDelete, spaceOptions: providedSpaces }: Props) {
-  const {spaces,saving}=useSpaces()
+  const {spaces,tasks,saving}=useSpaces()
   const spaceOptions=providedSpaces ?? spaces.map(s=>s.name)
   const [editingTitle,setEditingTitle]=useState(false)
   const [task, setTask] = useState(originalTask)
@@ -53,6 +54,10 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
     if (step.trim() || link.trim()) { setError('Add your pending step or link, or clear its input before saving.'); return }
     if (!validDueTime(task.dueTime) || (task.dueTime && !task.dueDate)) {setError('Choose a date for your deadline time.');return}
     if (!spaces.some(space=>space.name===task.space)) { setError('Choose an existing space for this task.'); return }
+    const zone=task.dueZone || Intl.DateTimeFormat().resolvedOptions().timeZone
+    if(task.dueDate && deadlineInstant(task.dueDate,task.dueTime,zone)===null){setError('Choose a time outside the daylight-saving clock change.');return}
+    if(tasks.some(t=>t.id!==(originalTask as {id?:string}).id && taskIdentity({...t,dueZone:t.dueZone || zone})===taskIdentity({...task,dueZone:zone}))){setError('This task already exists. Change the title, space, priority, or deadline.');return}
+
     if (task.space !== originalTask.space) { setConfirmMove(true); return }
     commitChanges({...task,title:task.title.trim()})
     onClose()
@@ -123,7 +128,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
             <div className="min-w-0 text-sm"><p>Priority</p><PlannerSelect priorityIcons label="Priority" value={task.priority} onChange={value=>onChange({priority:value as TaskDraft['priority']})} options={['High','Medium','Low'].map(value=>({value,label:value}))} className="mt-1 w-full"/></div>
             <label className="min-w-0 text-sm min-[360px]:col-span-2">Due date<input type="date" className={field} value={task.dueDate ?? ''} onChange={(event) => { const now = new Date(); const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; onChange({ dueDate: event.target.value, dueToday: event.target.value === today, dueTime: event.target.value ? task.dueTime : '' }) }} /></label>
           </div>
-          <div className="mb-5"><TimePicker value={task.dueTime ?? ''} onChange={dueTime=>onChange({dueTime})} disabled={!task.dueDate}/></div>
+          <div className="mb-5"><p className="text-xs text-gray">Deadline timezone: {task.dueZone || Intl.DateTimeFormat().resolvedOptions().timeZone}</p><TimePicker value={task.dueTime ?? ''} onChange={dueTime=>onChange({dueTime})} disabled={!task.dueDate}/></div>
         </header>
         <section className="border-t border-dark-blue/15 py-4">
           <div className="flex items-center justify-between"><h3 className="font-bold">Notes</h3><button type="button" onClick={() => setEditingNotes(!editingNotes)} className="rounded px-2 py-1 text-xs text-link">{editingNotes ? 'Done' : '✎ Edit'}</button></div>
@@ -178,6 +183,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
         </section>
         <footer className="sticky bottom-0 mt-auto border-t border-dark-blue/15 bg-surface py-4">
           <p className="mb-2 text-xs text-gray">{saving ? 'Saving your changes…' : dirty ? 'Unsaved changes' : 'Changes are saved only when you choose Save changes.'}</p>
+          
           <div className="flex flex-wrap items-center justify-between gap-2">
             <button type="button" onClick={() => setConfirmDelete(true)} className="min-h-11 rounded px-2 text-sm text-red">Delete task</button>
             <button type="button" onClick={requestClose} className="min-h-11 rounded border border-blue px-3 text-sm text-link">Cancel</button>

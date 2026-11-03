@@ -15,7 +15,7 @@ export const SpacesContext = createContext<{
   permanentlyDelete:(ids:string[])=>void;
   deleteSpace:(id:string,moveTo?:string)=>void;
   spaces: Space[]; setSpaces: Dispatch<SetStateAction<Space[]>>;
-  activity: {day:string;count:number}[]; saving:boolean; ensureSaved:()=>Promise<boolean>; notify:(message:string)=>void;
+  activity: {day:string;count:number}[]; saving:boolean; syncing?:boolean; ensureSaved:()=>Promise<boolean>; notify:(message:string)=>void; resetActivity:()=>Promise<void>;
   tasks: SpaceTask[]; setTasks: Dispatch<SetStateAction<SpaceTask[]>>;
 } | null>(null)
 export function useSpaces() {

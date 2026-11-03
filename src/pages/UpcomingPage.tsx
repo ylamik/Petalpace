@@ -297,7 +297,7 @@ export default function UpcomingPage() {
                   </span>
                 </div>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <h2 className="text-2xl font-bold">{label}</h2>
+                  <h2 className="text-lg font-bold">{label}</h2>
                   <span className="text-xs text-gray">
                     {group.length} {group.length === 1 ? "task" : "tasks"}
                   </span>
@@ -339,7 +339,7 @@ export default function UpcomingPage() {
           onToggle={(event) => setMissedOpen(event.currentTarget.open)}
           className="mt-5 border-t border-dark-blue/15 pt-4"
         >
-          <summary className="cursor-pointer text-xl font-semibold text-red">
+          <summary className="cursor-pointer text-base font-semibold text-red">
             Missed deadlines ({missed.length})
           </summary>
           {missed.length > 0 && (
@@ -360,7 +360,7 @@ export default function UpcomingPage() {
           onToggle={(event) => setCompletedOpen(event.currentTarget.open)}
           className="mt-5 border-t border-dark-blue/15 pt-4"
         >
-          <summary className="cursor-pointer text-xl font-semibold">
+          <summary className="cursor-pointer text-base font-semibold">
             Completed ({completed.length})
           </summary>
           <ul className="mt-3 space-y-3">{completed.map(renderRow)}</ul>

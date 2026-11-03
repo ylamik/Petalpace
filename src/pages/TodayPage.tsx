@@ -1,7 +1,8 @@
+import { taskDaysUntil } from '../features/tasks/components/taskPresentation'
 import { usePlannerClock } from '../hooks/usePlannerClock'
 import DeadlineLabel from '../features/tasks/components/DeadlineLabel';
 import { useSpaces, type SpaceTask as Task } from "../features/spaces/spaces";
-import { localDateKey, compareTasks, isDeadlineOverdue } from "../features/tasks/components/taskPresentation";
+import { compareTasks, isDeadlineOverdue } from "../features/tasks/components/taskPresentation";
 import ActivityHeatmap from "../features/tasks/components/ActivityHeatmap";
 import TaskRows from "../features/tasks/components/TaskRows";
 import TaskSpaceBadge from "../features/tasks/components/TaskSpaceBadge";
@@ -64,17 +65,17 @@ function TaskBadges({ task }: { task: Task }) {
 export default function TodayPage() {
   const { tasks: allTasks, setTasks, notify: setNotice } = useSpaces();
   const clock = usePlannerClock();
-  const todayKey = localDateKey(clock);
+
   // Today shows: tasks due today (any status), overdue unfinished tasks,
   // and undated unfinished tasks.  Completed tasks that aren't due today,
   // pinned future tasks, and future tasks are excluded from this list.
   const tasks = allTasks.filter(
     (task) =>
-      task.dueDate === todayKey ||
-      (!task.done && (!task.dueDate || task.dueDate < todayKey)),
+      taskDaysUntil(task,clock) === 0 ||
+      (!task.done && (!task.dueDate || (taskDaysUntil(task,clock) ?? 1) < 0)),
   );
   const upcoming = allTasks
-    .filter((task) => !task.done && task.dueDate > todayKey)
+    .filter((task) => !task.done && (taskDaysUntil(task,clock) ?? -1) > 0)
     .sort((a, b) => compareTasks(a,b,'nearest'))
     .slice(0, 3);
   const [newTask, setNewTask] = useState("");

@@ -1,5 +1,9 @@
+import { createReminderSettingsHandler } from './reminders.mjs'
 import { clientIP } from './client-ip.mjs'
 import { createPlannerHandler } from './planner.mjs'
+import { buildZip } from './zip-builder.mjs'
+import { registerSSE } from './sse-broker.mjs'
+import { createCollabHandler } from './collab.mjs'
 import { randomBytes, randomUUID, createHash, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import { prepareProfilePhoto } from './profile-photo.mjs'
@@ -84,9 +88,16 @@ export function createAuthHandler({ db, env = process.env, send = fetch, now = D
       throw Object.assign(new Error('We could not send the account email. Please try again later. During local testing, the Resend test sender can only email its account owner.'), { status: 503 })
     }
   }
+  const reminderSettings=createReminderSettingsHandler({db,findSession,origins,limit,env})
   const planner = createPlannerHandler({db,findSession,origins,limit,now})
+  const collab = createCollabHandler({db,findSession,origins,limit,send,env,now})
   return async function handleAuth(req, res) {
-    if (req.url === '/api/auth/planner') return planner(req,res)
+    if (req.url === '/api/auth/reminders') return reminderSettings(req,res)
+    if (req.url === '/api/auth/planner' || req.url === '/api/auth/planner/version') return planner(req,res)
+    if (req.url?.startsWith('/api/collab/')) {
+      const handled = await collab(req, res)
+      if (handled !== null) return
+    }
     const reply = (status, data, headers = {}) => {
       res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', ...headers })
       res.end(JSON.stringify(data))
@@ -106,26 +117,64 @@ export function createAuthHandler({ db, env = process.env, send = fetch, now = D
         const user = findSession(req)
         return reply(user ? 200 : 401, { user: user ? userView(user) : null })
       }
+      if (req.url === '/api/auth/stream' && req.method === 'GET') {
+        const user = findSession(req)
+        if (!user) return reply(401, { error: 'Please sign in.' })
+        // Subscribe to both personal planner changes and collaboration task changes
+        registerSSE([user.id, `collab:${user.id}`], res, () => findSession(req)?.id === user.id)
+        return
+      }
       if (req.url === '/api/auth/export' && req.method === 'GET') {
         const user = findSession(req)
         if (!user) return reply(401, { error: 'Please sign in.' })
         const row = db.prepare('SELECT revision,data FROM planners WHERE user_id = ?').get(user.id)
-        const activityRows = db.prepare('SELECT day,COUNT(*) AS count FROM completions WHERE user_id=? GROUP BY day ORDER BY day').all(user.id)
-        const exportData = JSON.stringify({
-          exportedAt: new Date().toISOString(),
-          account: { name: user.name, email: user.email },
-          planner: row ? JSON.parse(row.data) : { spaces: [], tasks: [] },
-          activity: activityRows,
-          bin: db.prepare('SELECT data,deleted_at FROM task_trash WHERE user_id=? AND data IS NOT NULL AND deleted_at>?').all(user.id,now()-30*86400000).map(row=>({...JSON.parse(row.data),deletedAt:row.deleted_at})),
-          revision: row?.revision ?? 0,
-        }, null, 2)
+        const planner = row ? JSON.parse(row.data) : { spaces: [], tasks: [] }
+        const exportedAt = new Date().toISOString().slice(0, 10)
+
+        // ── 1. Build tasks.csv ────────────────────────────────────────────
+        const cell = value => {let v=value==null?'':String(value);if(/^[\s]*[=+@-]|^[\t\r\n]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'}
+        const csvLine = cols => cols.map(cell).join(',')
+        const headers = ['Title','Space','Status','Priority','Due Date','Due Time','Timezone',
+          'Notes','Pinned','Steps (total)','Steps (completed)','Step list','Links','Files']
+        const dataRows = (planner.tasks ?? []).map(task => {
+          const status = task.done ? 'Done' : task.blocked ? 'Blocked' : task.started ? 'In progress' : 'To do'
+          return [
+            task.title, task.space, status, task.priority,
+            task.dueDate || '', task.dueTime || '', task.dueZone || '', task.notes || '',
+            task.pinned ? 'Yes' : 'No',
+            (task.steps ?? []).length,
+            (task.completedSteps ?? []).length,
+            (task.steps ?? []).join(' | '),
+            (task.links ?? []).join(' | '),
+            (task.files ?? []).map(f => f.name).join(' | '),
+          ]
+        })
+        // UTF-8 BOM so Excel opens without an import wizard
+        const csv = '\uFEFF' + [csvLine(headers), ...dataRows.map(csvLine)].join('\r\n')
+
+        // ── 2. Collect file attachments ───────────────────────────────────
+        const zipEntries = [{ name: 'tasks.csv', data: Buffer.from(csv, 'utf8') }]
+        for (const task of (planner.tasks ?? [])) {
+          for (const file of (task.files ?? [])) {
+            if (!file.name || !file.data) continue
+            // Sanitise the task title so it's safe as a folder name
+            const folder = task.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim().slice(0, 60) || task.id
+            zipEntries.push({
+              name: `files/${folder}-${String(task.id).replace(/[^a-zA-Z0-9_-]/g,'_')}/${(task.files ?? []).indexOf(file)}-${file.name.replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')}`, 
+              data: Buffer.from(file.data, 'base64'),
+            })
+          }
+        }
+
+        const zipBuffer = buildZip(zipEntries)
+
         res.writeHead(200, {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Content-Disposition': 'attachment; filename="petalpace-export.json"',
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename="petalpace-export-${exportedAt}.zip"`,
           'Cache-Control': 'no-store',
           'X-Content-Type-Options': 'nosniff',
         })
-        return res.end(exportData)
+        return res.end(zipBuffer)
       }
       const actions = ['register', 'login', 'logout', 'verify', 'resend', 'forgot-password', 'reset-password', 'photo', 'photo-remove', 'delete-account']
       const action = req.url?.slice('/api/auth/'.length)

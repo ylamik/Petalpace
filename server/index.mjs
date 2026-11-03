@@ -1,3 +1,5 @@
+import { closeStreams } from './sse-broker.mjs'
+import { createReminderWorker } from './reminders.mjs'
 import { validateProductionConfig } from './production-config.mjs'
 import { cleanupExpired } from './maintenance.mjs'
 import { createFeedbackServer } from './feedback.mjs'
@@ -24,6 +26,9 @@ const port = Number(process.env.PORT || process.env.FEEDBACK_PORT || 3001)
 const host = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1')
 const server = createFeedbackServer({ auth, staticDir, checkHealth: () => db.prepare('SELECT 1 AS ok').get().ok === 1 })
 cleanupExpired(db)
+const sendReminders=createReminderWorker({db})
+const reminderTimer=setInterval(()=>{void sendReminders().catch(()=>console.error('Reminder scan failed.'))},60000)
+reminderTimer.unref()
 const cleanupTimer = setInterval(() => { try { cleanupExpired(db) } catch { console.error('Scheduled cleanup failed; check database health.') } }, 3600000)
 cleanupTimer.unref()
 
@@ -47,6 +52,8 @@ function shutdown(signal) {
   stopping = true
   console.log(`${signal} received, finishing active requests...`)
   clearInterval(cleanupTimer)
+  clearInterval(reminderTimer)
+  closeStreams()
   server.close(() => { db.close(); process.exit(0) })
   // Stop accepting requests first; let current saves finish before forcing closure.
   setTimeout(() => { server.closeAllConnections(); process.exit(1) }, 35000).unref()

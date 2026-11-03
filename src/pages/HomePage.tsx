@@ -496,29 +496,12 @@ export default function HomePage() {
                     Capture an idea and choose a due date.
                   </p>
 
-                  <div
+                  <img
+                    src="/images/add-a-task.png"
+                    alt=""
                     aria-hidden="true"
-                    className="mt-5 rounded-md bg-lightest-blue/70 p-3"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-surface px-3 py-3 text-sm">
-                      <span className="text-gray">Write a task...</span>
-
-                      <span className="flex items-center gap-2 whitespace-nowrap">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          className="h-4 w-4"
-                        >
-                          <rect x="3" y="5" width="18" height="16" rx="2" />
-                          <path d="M16 3v4M8 3v4M3 11h18" />
-                        </svg>
-                        Oct 31
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                    className="mt-5 h-auto rounded w-full max-w-[340px] object-contain"
+                  />                </div>
               </motion.li>
 
               {/* Step 2 */}
@@ -544,50 +527,12 @@ export default function HomePage() {
                     Add smaller steps, files, and useful links.
                   </p>
 
-                  <div
+                  <img
+                    src="/images/break-it-down.png"
+                    alt=""
                     aria-hidden="true"
-                    className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2"
-                  >
-                    <div className="flex items-center gap-2 rounded-md border border-dark-blue/10 bg-surface p-3">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        className="h-8 w-8 shrink-0"
-                      >
-                        <path d="M14 2H5a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8z" />
-                        <path d="M14 2v6h6M8 12h8M8 16h8" />
-                      </svg>
-
-                      <div className="min-w-0 text-sm">
-                        <p className="text-gray">Add a file</p>
-                        <p className="truncate">notes.pdf</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 rounded-md border border-dark-blue/10 bg-surface p-3">
-                      <span className="rounded-md bg-lightest-blue p-1.5">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          className="h-5 w-5"
-                        >
-                          <path d="m10 13 4-4" />
-                          <path d="m8 11-3 3a4 4 0 0 0 6 6l3-3" />
-                          <path d="m10 7 3-3a4 4 0 0 1 6 6l-3 3" />
-                        </svg>
-                      </span>
-
-                      <div className="min-w-0 text-sm">
-                        <p className="text-gray">Add a link</p>
-                        <p className="truncate">https://...</p>
-                      </div>
-                    </div>
-                  </div>
+                    className="mt-5 h-auto w-full max-w-[340px] rounded object-contain"
+                  />
                 </div>
               </motion.li>
 
@@ -614,30 +559,12 @@ export default function HomePage() {
                     Pick your top three tasks for today.
                   </p>
 
-                  <div aria-hidden="true" className="mt-5 space-y-2">
-                    {[
-                      {
-                        title: "Research outline",
-                        color: "bg-lightest-blue/80",
-                      },
-                      {
-                        title: "Read chapter 6",
-                        color: "bg-light-pink",
-                      },
-                      {
-                        title: "Organize notes",
-                        color: "bg-light-green",
-                      },
-                    ].map((task) => (
-                      <div
-                        key={task.title}
-                        className={`flex items-center gap-2 rounded-md px-3 py-3 text-sm ${task.color}`}
-                      >
-                        <span className="h-4 w-4 shrink-0 rounded-sm border border-dark-blue/70 bg-surface" />
-                        <span>{task.title}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <img
+                    src="/images/choose-your-focus.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="mt-5 h-auto w-full max-w-[340px] rounded object-contain"
+                  />                
                 </div>
               </motion.li>
 
@@ -666,28 +593,12 @@ export default function HomePage() {
                     Mark tasks done and celebrate each step.
                   </p>
 
-                  <div
+                   <img
+                    src="/images/celebrate-your-progress.png"
+                    alt=""
                     aria-hidden="true"
-                    className="mt-5 flex flex-wrap items-center gap-2 rounded-md border border-dark-blue/10 bg-surface px-3 py-3 text-sm"
-                  >
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-dark-blue/70">
-                      <svg
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        stroke="#E98268"
-                        strokeWidth="2"
-                        className="h-3 w-3"
-                      >
-                        <path d="m3 8 3 3 7-8" />
-                      </svg>
-                    </span>
-
-                    <span>Finish draft</span>
-
-                    <span className="ml-auto rounded-md bg-light-green px-3 py-1">
-                      Done
-                    </span>
-                  </div>
+                    className="mt-5 h-auto w-full max-w-[340px] rounded object-contain"
+                  />     
                 </div>
               </motion.li>
             </ol>

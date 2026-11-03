@@ -84,7 +84,9 @@ export function createFeedbackServer({ env = process.env, send = fetch, auth, st
       res.writeHead(healthy ? 200 : 503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
       return res.end(JSON.stringify({ status: healthy ? 'ok' : 'unavailable', time: Date.now() }))
     }
-    if (auth && req.url?.startsWith('/api/auth/')) return auth(req, res)
+    if (auth && (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/collab/'))) {
+      try { return await auth(req, res) } catch { if (!res.headersSent) res.writeHead(500, {'Content-Type':'application/json'}); return res.end(JSON.stringify({error:'Could not complete this request. Please try again.'})) }
+    }
     const reply = (status, data) => {
       res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
       res.end(JSON.stringify(data))

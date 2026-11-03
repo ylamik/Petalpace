@@ -1,7 +1,7 @@
 import ThemeControl from '../ui/ThemeControl'
 import TaskReminders from '../../features/tasks/components/TaskReminders'
-import { useState } from 'react'
-import { Outlet } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Outlet, useLocation } from 'react-router'
 import Sidebar from './Sidebar'
 import ProfileMenu from '../auth/ProfileMenu'
 import { TopProgressBar } from '../ui/PageLoader'
@@ -11,8 +11,22 @@ import { useSpaces } from '../../features/spaces/spaces'
 export default function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const transitioning = usePageTransition(400)
-  const { saving } = useSpaces()
-  const showBar = transitioning || saving
+  const { saving, syncing } = useSpaces()
+  const showBar = transitioning || saving || !!syncing
+  const location = useLocation()
+  const mainRef = useRef<HTMLDivElement>(null)
+
+  // Scroll to top whenever the route changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    mainRef.current?.scrollTo({ top: 0, behavior: 'instant' })
+  }, [location.pathname])
+
+  // Scroll-to-top handler passed to Sidebar so clicking the active link scrolls up
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   return (
     <div className="min-h-dvh bg-canvas font-serif text-dark-blue lg:flex">
@@ -21,10 +35,10 @@ export default function AppLayout() {
 
       {/* Desktop sidebar */}
       <div className="sticky top-0 hidden h-dvh shrink-0 lg:block">
-        <Sidebar />
+        <Sidebar onScrollTop={scrollToTop} />
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div ref={mainRef} className="min-w-0 flex-1">
         {/* Mobile and tablet navigation */}
         <header className="sticky top-0 z-30 border-b border-dark-blue/10 bg-beige lg:hidden">
           <div className="flex items-center justify-between gap-3 px-3 py-2">
@@ -54,7 +68,7 @@ export default function AppLayout() {
             hidden={!menuOpen}
             className="max-h-[50dvh] overflow-y-auto border-t border-dark-blue/10"
           >
-            <Sidebar compact onNavigate={() => setMenuOpen(false)} />
+            <Sidebar compact onNavigate={() => setMenuOpen(false)} onScrollTop={scrollToTop} />
           </div>
         </header>
 

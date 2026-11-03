@@ -150,9 +150,15 @@ test('export is private and password-confirmed deletion revokes account access',
   const f=await fixture(t)
   await f.signup();await f.request('verify',{token:f.token()})
   const response=await f.request('login',{email,password});const cookie=response.headers.get('set-cookie').split(';')[0]
+  // Export requires a session
   assert.equal((await f.request('export')).status,401)
-  const exported=await f.request('export',undefined,cookie);const contents=await exported.json()
-  assert.equal(contents.account.email,email);assert.ok(Array.isArray(contents.bin));assert.ok(!JSON.stringify(contents).includes('password_hash'))
+  // Export returns a ZIP (PK signature) — not JSON
+  const exported=await f.request('export',undefined,cookie)
+  assert.equal(exported.status,200)
+  assert.equal(exported.headers.get('content-type'),'application/zip')
+  const buf=Buffer.from(await exported.arrayBuffer())
+  // ZIP local file header signature: PK\x03\x04
+  assert.equal(buf[0],0x50);assert.equal(buf[1],0x4B);assert.equal(buf[2],0x03);assert.equal(buf[3],0x04)
   assert.equal((await f.request('delete-account',{password:'wrong'},cookie)).status,401)
   assert.equal((await f.request('delete-account',{password},cookie,'https://foreign.example')).status,403)
   assert.equal((await f.request('delete-account',{password},cookie)).status,200)

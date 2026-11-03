@@ -29,7 +29,7 @@ export default function TimePicker({value,onChange,disabled=false}:{value:string
       <TimeNumber label="Minute" value={value?String(minute).padStart(2,'0'):''} placeholder="MM" min={0} max={59} onChange={next=>update(hour,next)}/>
       <div className="grid grid-rows-2 gap-1">{['AM','PM'].map(item=><button type="button" key={item} aria-pressed={!!value && period===item} onClick={()=>update(hour,minute,item)} className={`min-h-6 rounded border px-2 text-sm font-medium focus-visible:outline-blue ${value && period===item?'border-blue bg-lightest-blue text-dark-blue':'border-dark-blue/20 bg-surface text-gray hover:bg-beige'}`}>{item}</button>)}</div>
     </div>
-    <p id={id} className="mt-2 text-xs text-gray">{disabled?'Choose a due date first.':'Type a time or use the arrows. Deadlines follow local time on each device (including when you travel).'}</p>
+    <p id={id} className="mt-2 text-xs text-gray">{disabled?'Choose a due date first.':'Type a time or use the arrows. The saved deadline timezone stays fixed when you travel.'}</p>
     {value && <button type="button" onClick={()=>onChange('')} className="mt-1 min-h-9 text-sm text-link underline underline-offset-2">Clear time</button>}
   </fieldset>
 }

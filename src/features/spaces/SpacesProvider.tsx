@@ -3,6 +3,8 @@ import ConfirmTaskDialog from '../tasks/components/ConfirmTaskDialog'
 import PageLoader from '../../components/ui/PageLoader'
 import { useCallback, useEffect, useRef, useState, type ReactNode, type SetStateAction } from 'react'
 import { SpacesContext, type Space, type SpaceTask, type DeletedTask } from './spaces'
+import { useAuth } from '../auth/auth'
+import { usePlannerSync } from '../../hooks/usePlannerSync'
 type Snapshot={spaces:Space[];tasks:SpaceTask[]}
 type WireFile={name:string;type:string;lastModified:number;data:string}
 const fileReferences = new WeakMap<File, {taskId:string;index:number}>()
@@ -22,6 +24,7 @@ async function request(data?:unknown) {
   return result
 }
 export default function SpacesProvider({children}:{children:ReactNode}) {
+  const {user}=useAuth()
   const [data,setData]=useState<Snapshot|null>(null)
   const [trash,setTrash]=useState<DeletedTask[]>([])
   const purgeIdsRef=useRef<string[]>([])
@@ -40,12 +43,42 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
     let cancelled=false
     request().then(result=>{
       if(cancelled)return
-      const tasks=(result.tasks as WireTask[]).map(decode)
+      const tasks=(result.tasks as WireTask[]).map(task=>decode({...task,dueZone:task.dueZone || Intl.DateTimeFormat().resolvedOptions().timeZone}))
       const initial={spaces:result.spaces as Space[],tasks}
-      trashRef.current=decodeTrash(result.trash);setTrash(trashRef.current);revision.current=result.revision;saved.current=initial;setActivity(result.activity);setData(initial)
+      trashRef.current=decodeTrash(result.trash);setTrash(trashRef.current);revision.current=result.revision;saved.current=(result.tasks as WireTask[]).some(t=>!t.dueZone)?{...initial,tasks:(result.tasks as WireTask[]).map(decode)}:initial;setActivity(result.activity);setData(initial)
     }).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Could not load your planner.')})
     return()=>{cancelled=true;alive.current=false}
   },[])
+
+  // SSE: silently re-fetch when another tab/device saves the planner,
+  // but only if this tab has nothing pending (to avoid overwriting local work).
+  const [syncing, setSyncing]=useState(false)
+  const remotePending=useRef(false)
+  const refreshing=useRef(false)
+  const refreshRemote=useCallback(async()=>{
+    remotePending.current=true
+    if(refreshing.current || pending.current || running.current || failed.current || !alive.current || document.querySelector('dialog[open]')) return
+    refreshing.current=true;setSyncing(true)
+    try {
+      const start=saved.current
+      const versionResponse=await fetch('/api/auth/planner/version',{cache:'no-store',signal:AbortSignal.timeout(12000)})
+      if(!versionResponse.ok)throw new Error('Could not check updates.')
+      const version=await versionResponse.json()
+      if(version.revision<=revision.current){remotePending.current=false;return}
+      const result=await request()
+      if(!alive.current) return
+      if(pending.current || running.current || failed.current || saved.current!==start || document.querySelector('dialog[open]')) return
+      if(result.revision>revision.current){
+        const fresh={spaces:result.spaces as Space[],tasks:(result.tasks as WireTask[]).map(decode)}
+        trashRef.current=decodeTrash(result.trash);setTrash(trashRef.current)
+        revision.current=result.revision;saved.current=fresh;setData(fresh);setActivity(result.activity)
+      }
+      remotePending.current=false
+    }catch{setNotice({message:'Live updates are reconnecting. Your saved tasks are safe.',id:Date.now()})}
+    finally{refreshing.current=false;if(alive.current)setSyncing(false)}
+  },[])
+  usePlannerSync(user?.id, refreshRemote)
+  useEffect(()=>{const timer=setInterval(()=>{if(remotePending.current)void refreshRemote()},1500);return()=>clearInterval(timer)},[refreshRemote])
   const flush=useCallback(async()=>{
     if(running.current || failed.current || !alive.current)return
     running.current=true;setSaving(true)
@@ -99,13 +132,18 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
   const setSpaces=useCallback((action:SetStateAction<Space[]>)=>setData(current=>current?{...current,spaces:typeof action==='function'?action(current.spaces):action}:current),[])
   const setTasks=useCallback((action:SetStateAction<SpaceTask[]>)=>setData(current=>{
     if(!current)return current
-    const tasks=(typeof action==='function'?action(current.tasks):action).map(task=>({...task,spaceId:current.spaces.find(s=>s.name===task.space)?.id??task.spaceId,pinned:task.done?false:task.pinned}))
+    remotePending.current=true
+    const tasks=(typeof action==='function'?action(current.tasks):action).map(task=>({...task,dueZone:task.dueZone || Intl.DateTimeFormat().resolvedOptions().timeZone,spaceId:current.spaces.find(s=>s.name===task.space)?.id??task.spaceId,pinned:task.done?false:task.pinned}))
     return {...current,tasks}
   }),[])
   const permanentlyDelete=useCallback((ids:string[])=>{
     if(!ids.length)return
     purgeIdsRef.current=[...new Set([...purgeIdsRef.current,...ids])]
     setData(current=>current?{...current}:current)
+  },[])
+  const resetActivity=useCallback(async()=>{
+    await fetch('/api/auth/planner',{method:'DELETE',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(15000)})
+    setActivity([])
   },[])
   function undoDelete(){
     if(!data || !notice?.undoTasks?.length)return
@@ -120,13 +158,14 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
     if(error) return <main className="min-h-dvh bg-page p-8 font-serif text-dark-blue"><p role="alert">{error}</p><button type="button" onClick={()=>window.location.reload()} className="mt-4 rounded-lg bg-blue px-4 py-2 text-white">Try again</button></main>
     return <PageLoader label="Opening your planner…" />
   }
-  return <SpacesContext.Provider value={{...data,trash,permanentlyDelete,setSpaces,setTasks,deleteSpace,activity,saving,notify,ensureSaved}}>
+  return <SpacesContext.Provider value={{...data,trash,permanentlyDelete,setSpaces,setTasks,deleteSpace,activity,saving,syncing,notify,ensureSaved,resetActivity}}>
     {children}
+    {syncing && <div role="status" className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg border border-blue/30 bg-surface px-4 py-2 text-sm text-dark-blue shadow">Updating from your other device…</div>}
     <div className="fixed right-4 bottom-4 left-4 z-50 flex flex-col gap-3 sm:left-auto sm:w-96">
       {error && <div role="alert" className="rounded-xl border border-red/30 bg-surface p-4 text-dark-blue shadow-lg"><p className="font-semibold">Your changes haven’t been saved</p><p className="mt-1 text-sm">{error}</p><div className="mt-3 flex gap-3"><button onClick={()=>{failed.current=false;void flush()}} className="rounded bg-blue px-3 py-2 text-white">Retry saving</button><button onClick={()=>setReloadOpen(true)} className="text-sm text-link underline">Reload saved version</button></div></div>}
-      {notice && <div role="status" className="flex items-start gap-3 rounded-xl border border-dark-blue/20 bg-surface p-4 text-dark-blue shadow-lg">{notice.taskLink ? <img src="/images/task-added.png" alt="" aria-hidden="true" className="h-9 w-9 shrink-0 object-contain"/> : <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-6 w-6 shrink-0 text-link"><path d="m5 12 4 4L19 6"/></svg>}<div className="min-w-0 flex-1 text-base"><p>{notice.message}</p>{notice.undoTasks?.length ? <button type="button" onClick={undoDelete} disabled={saving} className="mt-2 min-h-11 rounded-lg border border-blue px-4 text-sm font-semibold text-link hover:bg-beige disabled:opacity-50">Undo deletion</button> : null}{notice.binLink && <Link to="/bin" onClick={()=>setNotice(null)} className="mt-2 ml-3 inline-block text-sm font-medium text-link underline">View Bin</Link>}{notice.taskLink && <Link to="/tasks" onClick={()=>setNotice(null)} className="mt-1 inline-block text-sm font-medium text-link underline underline-offset-2">View in All tasks</Link>}</div><button onClick={()=>setNotice(null)} aria-label="Dismiss notification" className="rounded px-2 text-xl text-link">×</button></div>}
+      {notice && <div role="status" className={`flex gap-3 rounded-xl border border-dark-blue/20 bg-surface p-4 text-dark-blue shadow-lg ${notice.undoTasks?.length || notice.binLink || notice.taskLink ? 'items-start' : 'items-center'}`}><img src="/images/task-added.png" alt="" aria-hidden="true" className="h-9 w-9 shrink-0 object-contain"/><div className="min-w-0 flex-1 text-base"><p>{notice.message}</p>{notice.undoTasks?.length ? <button type="button" onClick={undoDelete} disabled={saving} className="mt-2 min-h-11 rounded-lg border border-blue px-4 text-sm font-semibold text-link hover:bg-beige disabled:opacity-50">Undo deletion</button> : null}{notice.binLink && <Link to="/bin" onClick={()=>setNotice(null)} className="mt-2 ml-3 inline-block text-sm font-medium text-link underline">View Bin</Link>}{notice.taskLink && <Link to="/tasks" onClick={()=>setNotice(null)} className="mt-1 inline-block text-sm font-medium text-link underline underline-offset-2">View in All tasks</Link>}</div><button onClick={()=>setNotice(null)} aria-label="Dismiss notification" className="rounded px-2 text-xl text-link">×</button></div>}
     </div>
     {reloadOpen && <ConfirmTaskDialog title="Reload your saved planner?" message="Unsaved changes on this page will be discarded. Your saved tasks will stay safe." confirmLabel="Reload saved version" onCancel={()=>setReloadOpen(false)} onConfirm={()=>{pending.current=null;window.location.reload()}}/>}
-    <span role="status" className="sr-only">{saving?'Saving planner changes…':error?'Planner changes not saved.':'Planner saved.'}</span>
+    <span role="status" className="sr-only">{saving?'Saving planner changes…':syncing?'Syncing your planner…':error?'Planner changes not saved.':'Planner saved.'}</span>
   </SpacesContext.Provider>
 }

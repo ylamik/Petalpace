@@ -20,6 +20,8 @@ export default function AuthPage({ mode }: AuthPageProps) {
   const newPassword = isSignUp || isReset
   const { user, signIn, refresh } = useAuth()
   const navigate = useNavigate()
+  const pendingInvite=sessionStorage.getItem('petalpace-pending-invite') || ''
+  const afterSignIn=/^\/collaboration\/join#token=[a-f0-9]{64}$/.test(pendingInvite)?pendingInvite:'/today'
   const location = useLocation()
   const formRef = useRef<HTMLFormElement>(null)
   const busyRef = useRef(false)
@@ -44,7 +46,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
       if (mode === 'sign-in' && !resend) {
         await signIn(email, password)
         form.reset()
-        navigate('/today', { replace: true })
+        navigate(afterSignIn, { replace: true })
         return
       }
       const action = resend ? 'resend' : isSignUp ? 'register' : isVerify ? 'verify' : mode
@@ -62,7 +64,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
     void submit()
   }
 
-  if (user && (mode === 'sign-in' || isSignUp)) return <Navigate to="/today" replace />
+  if (user && (mode === 'sign-in' || isSignUp)) return <Navigate to={afterSignIn} replace />
 
   return (
     <main className="min-h-dvh bg-page font-serif text-dark-blue md:flex md:items-center md:justify-center md:p-6 lg:p-10">

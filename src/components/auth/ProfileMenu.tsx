@@ -1,3 +1,4 @@
+import ReminderSettings from './ReminderSettings'
 import AccountDataDialog from './AccountDataDialog'
 import PhotoCropDialog from './PhotoCropDialog'
 import ConfirmTaskDialog from '../../features/tasks/components/ConfirmTaskDialog'
@@ -19,6 +20,7 @@ export default function ProfileMenu({ doodle = true, compact = false }: { doodle
   const [open, setOpen] = useState(false)
   const [cropFile, setCropFile] = useState<File | null>(null)
   const [confirmation, setConfirmation] = useState<'remove' | 'reset' | 'logout' | null>(null)
+  const [remindersOpen,setRemindersOpen]=useState(false)
   const [dataAction, setDataAction] = useState<'export' | 'delete' | null>(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -96,13 +98,15 @@ export default function ProfileMenu({ doodle = true, compact = false }: { doodle
 
       {user.photoUrl && <button type="button" disabled={busy} onClick={() => ask('remove')} className="mt-1 min-h-10 w-full rounded px-3 py-2 text-left text-sm text-link hover:bg-lightest-blue/30 disabled:opacity-60">Remove photo</button>}
       <button type="button" disabled={busy} onClick={() => ask('reset')} className="mt-2 flex min-h-10 w-full items-center rounded px-3 text-sm hover:bg-beige/60">Reset password</button>
-      <button type="button" disabled={busy} onClick={()=>{setOpen(false);setDataAction('export')}} className="mt-1 min-h-10 w-full rounded px-3 text-left text-sm hover:bg-beige/60">Export my data</button>
+      <button type="button" onClick={()=>{setOpen(false);setRemindersOpen(true)}} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-beige">Email reminders</button>
+          <button type="button" disabled={busy} onClick={()=>{setOpen(false);setDataAction('export')}} className="mt-1 min-h-10 w-full rounded px-3 text-left text-sm hover:bg-beige/60">Export my data</button>
       <button type="button" disabled={busy} onClick={()=>{setOpen(false);setDataAction('delete')}} className="mt-1 min-h-10 w-full rounded px-3 text-left text-sm text-red hover:bg-light-pink">Delete account</button>
       <div className="mt-2 border-t border-dark-blue/10 pt-2"><button type="button" disabled={busy} onClick={() => ask('logout')} className="min-h-11 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-red hover:bg-light-pink disabled:opacity-60">Sign out</button></div>
       {notice && <p role="status" className="mt-2 text-sm leading-relaxed">{notice}</p>}
     </div>}
     {dataAction && <AccountDataDialog mode={dataAction} onClose={()=>{setDataAction(null);setOpen(true)}}/>}
-    {cropFile && <PhotoCropDialog file={cropFile} onCancel={()=>{setCropFile(null);setOpen(true)}} onSave={savePhoto}/>}
+    {remindersOpen && <ReminderSettings onClose={()=>setRemindersOpen(false)}/>}
+      {cropFile && <PhotoCropDialog file={cropFile} onCancel={()=>{setCropFile(null);setOpen(true)}} onSave={savePhoto}/>}
     {confirmation && <ConfirmTaskDialog
       title={confirmation==='remove' ? 'Remove your profile photo?' : confirmation==='reset' ? 'Reset your password?' : 'Sign out of Petalpace?'}
       message={confirmation==='remove' ? 'Your initials will appear instead. You can add another photo anytime.' : confirmation==='reset' ? 'Continue to the password reset page to request a secure email link. Your password stays the same until you choose a new one.' : 'Your saved tasks will be here when you sign in again.'}

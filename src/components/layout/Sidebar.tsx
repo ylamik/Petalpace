@@ -10,15 +10,17 @@ const navigation = [
   { name: "Upcoming",  icon: "/icons/upcoming-icon (1).png",    path: "/upcoming" },
   { name: "All Tasks", icon: "/icons/all-tasks-icon.png",       path: "/tasks" },
   { name: "Calendar",  icon: "/icons/calendar-icon.png",        path: "/calendar" },
+  { name: "Collaboration", icon: null, path: "/collaboration" },
 ];
 
 type SidebarProps = {
   compact?: boolean;
   onNavigate?: () => void;
   onAddSpace?: () => void;
-};
+  onScrollTop?: () => void;
+}
 
-export default function Sidebar({ onNavigate, onAddSpace, compact = false }: SidebarProps) {
+export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScrollTop }: SidebarProps) {
   const { spaces, trash } = useSpaces();
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,24 +40,32 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false }: Sid
 
       <nav
         aria-label="Main navigation"
-        className={compact ? "grid grid-cols-3 gap-1 text-sm" : "mt-5 shrink-0 space-y-1"}
+        className={compact ? "grid grid-cols-3 gap-1 text-sm" : "mt-5 shrink-0 space-y-1 text-[0.9375rem]"}
       >
         {navigation.map((item) => (
           <NavLink
             key={item.name}
             to={item.path}
-            onClick={onNavigate}
+            onClick={(e) => {
+              // If already on this page, just scroll to top instead of navigating
+              if (location.pathname === item.path) {
+                e.preventDefault()
+                onScrollTop?.()
+              }
+              onNavigate?.()
+            }}
             className={({ isActive }) =>
-              `flex w-full items-center gap-4 rounded-lg px-3 py-3 font-medium text-left hover:bg-lightest-blue ${isActive ? "bg-lightest-blue" : ""}`
+              `flex w-full items-center gap-4 rounded-lg px-3 py-3 text-sm font-medium text-left hover:bg-lightest-blue ${isActive ? "bg-lightest-blue" : ""}`
             }
           >
-            <img
-              src={item.icon}
-              alt=""
-              width={24}
-              height={24}
-              className={compact ? "hidden" : "h-6 w-6 object-contain"}
-            />
+            {item.icon ? (
+              <img src={item.icon} alt="" width={20} height={20} className={compact ? "hidden" : "h-5 w-5 object-contain"} />
+            ) : (
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={compact ? "hidden" : "h-5 w-5 shrink-0"}>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            )}
             <span>{item.name}</span>
           </NavLink>
         ))}
@@ -64,7 +74,7 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false }: Sid
       <hr className="border-dark-blue/15 my-4" />
 
       <div className="flex justify-between items-center mx-2">
-        <p className="font-medium text-gray">My spaces</p>
+        <p className="text-sm font-medium text-gray">My spaces</p>
         <button
           type="button"
           className="cursor-pointer hover:bg-surface/50 rounded-full p-2"
@@ -79,7 +89,7 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false }: Sid
         </button>
       </div>
 
-      <ul className={compact ? "mt-1 grid grid-cols-2 gap-1 text-sm sm:grid-cols-3" : "mt-3 min-h-0 overflow-y-auto space-y-1"}>
+      <ul className={compact ? "mt-1 grid grid-cols-2 gap-1 text-sm sm:grid-cols-3" : "mt-3 min-h-0 overflow-y-auto space-y-1 text-[0.9375rem]"}>
         {spaces.map((space) => (
           <li
             key={space.id}
@@ -88,12 +98,18 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false }: Sid
             {/* Space nav link */}
             <NavLink
               to={"/spaces/" + space.id}
-              onClick={onNavigate}
-              className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-surface/50"
+              onClick={(e) => {
+                if (location.pathname === `/spaces/${space.id}`) {
+                  e.preventDefault()
+                  onScrollTop?.()
+                }
+                onNavigate?.()
+              }}
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-surface/50"
             >
               <span
                 aria-hidden="true"
-                className="h-5 w-5 shrink-0 rounded-full border border-dark-blue/30"
+                className="h-4 w-4 shrink-0 rounded-full border border-dark-blue/30"
                 style={{ backgroundColor: space.color }}
               />
               <span className="min-w-0 truncate" title={space.name}>
@@ -134,12 +150,18 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false }: Sid
 
       <NavLink
         to="/bin"
-        onClick={onNavigate}
+        onClick={(e) => {
+          if (location.pathname === '/bin') {
+            e.preventDefault()
+            onScrollTop?.()
+          }
+          onNavigate?.()
+        }}
         className={({ isActive }) =>
           `my-3 flex min-h-11 shrink-0 items-center gap-3 rounded-lg border-t border-dark-blue/10 px-3 py-3 text-sm font-medium hover:bg-lightest-blue ${isActive ? "bg-lightest-blue" : ""}`
         }
       >
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4">
           <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />
         </svg>
         <span>Bin</span>

@@ -1,3 +1,4 @@
+import { taskIdentity, deadlineInstant } from '../deadlineZone'
 import TimePicker from './TimePicker'
 import PlannerSelect from '../../../components/ui/PlannerSelect'
 import TaskSpaceSelect from './TaskSpaceSelect'
@@ -20,6 +21,7 @@ export type TaskDraft = {
   priority: 'High' | 'Medium' | 'Low'
   dueDate: string
   dueTime?: string
+  dueZone?: string
   notes: string
   steps: string[]
   files: File[]
@@ -42,7 +44,7 @@ type Props = {
 const field = 'min-h-10 w-full min-w-0 rounded-lg border border-dark-blue/20 bg-surface px-3 py-2 text-base placeholder:text-gray focus:outline-none focus:ring-2 focus:ring-blue/30'
 
 export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initialTask, focusDueDate = false, defaultSpace = '', spaceOptions: providedSpaces, canPin, onClose, onCreate }: Props) {
-  const {spaces,saving}=useSpaces()
+  const {spaces,tasks,saving}=useSpaces()
   const spaceOptions=providedSpaces ?? spaces.map(s=>s.name)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -51,6 +53,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
   const [space, setSpace] = useState<TaskDraft['space'] | ''>(initialTask?.space ?? defaultSpace)
   const [priority, setPriority] = useState<TaskDraft['priority'] | ''>(initialTask?.priority ?? '')
   const [dueDate, setDueDate] = useState(initialTask?.dueDate ?? defaultDueDate)
+  const [dueZone] = useState(initialTask?.dueZone || Intl.DateTimeFormat().resolvedOptions().timeZone)
   const [dueTime, setDueTime] = useState(initialTask?.dueTime ?? '')
   const [notes, setNotes] = useState(initialTask?.notes ?? '')
   const [pinned, setPinned] = useState(initialTask?.pinned ?? false)
@@ -136,7 +139,10 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
       setError('Your top three is full. Turn off pinning to continue.')
       return
     }
-    onCreate({ ...statusChange(status), title: title.trim(), space, priority, dueDate, dueTime, notes: notes.trim(), pinned,
+    if(dueDate && deadlineInstant(dueDate,dueTime,dueZone)===null){setError('This time does not exist because the clocks change. Choose a different time.');return}
+    const identity=taskIdentity({title,space,priority,dueDate,dueTime,dueZone})
+    if(tasks.some(t=>t.id!==(initialTask as {id?:string})?.id && taskIdentity({...t,dueZone:t.dueZone || dueZone})===identity)){setError('This task already exists. Change the title, space, priority, or deadline.');return}
+    onCreate({ ...statusChange(status), title: title.trim(), space, priority, dueDate, dueTime, dueZone, notes: notes.trim(), pinned,
       steps: steps.map((step) => step.text.trim()).filter(Boolean), files, links })
     onClose()
   }
@@ -151,7 +157,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
           <button type="button" onClick={requestClose} aria-label="Close task dialog" className="flex h-10 w-10 items-center justify-center rounded-lg text-2xl hover:bg-beige">×</button>
         </div>
         <div className="space-y-4">
-          <TaskTitleInput value={title} onChange={setTitle}/>
+          <TaskTitleInput value={title} onChange={v => { setTitle(v) }}/>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="mb-1 block font-semibold">Space</p>
@@ -162,7 +168,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
               <input ref={dateRef} id="task-date" type="date" value={dueDate} onChange={(e) => {setDueDate(e.target.value);if(!e.target.value)setDueTime('')}} className={field} />
             </div>
           </div>
-          <TimePicker value={dueTime} onChange={setDueTime} disabled={!dueDate}/>
+          <p className="text-xs text-gray">Deadline timezone: {dueZone}. This stays the same when you travel.</p><TimePicker value={dueTime} onChange={setDueTime} disabled={!dueDate}/>
           <div className="sm:w-[calc(50%_-_0.5rem)]">
             <p className="mb-1 block font-semibold">Priority</p>
             <PlannerSelect priorityIcons label="Priority" value={priority} onChange={value=>setPriority(value as TaskDraft['priority'])} options={[{value:'',label:'Select priority'},...['High','Medium','Low'].map(value=>({value,label:value}))]}/>
@@ -231,6 +237,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
             </ul>
           </div>
           <p role="alert" className={error ? 'text-sm text-red' : 'sr-only'}>{error}</p>
+          
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" onClick={requestClose} className="min-h-11 rounded-lg border border-blue px-5 font-semibold text-link hover:bg-lightest-blue/30">Cancel</button>

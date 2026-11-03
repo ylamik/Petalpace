@@ -16,6 +16,9 @@ import NotFoundPage from './pages/NotFoundPage'
 import AuthProvider from './features/auth/AuthProvider'
 import RequireAccount from './features/auth/RequireAccount'
 import AuthPage from './components/auth/AuthPage'
+import CollaborationPage from './pages/CollaborationPage'
+import CollabTaskPage from './pages/CollabTaskPage'
+import CollabJoinPage from './pages/CollabJoinPage'
 
 export default function App() {
   useEffect(()=>{applyTheme();return subscribeTheme(()=>{})},[])
@@ -29,6 +32,8 @@ export default function App() {
           <Route path="/verify-email" element={<AuthPage key="verify" mode="verify-email" />} />
           <Route path="/forgot-password" element={<AuthPage key="forgot" mode="forgot-password" />} />
           <Route path="/reset-password" element={<AuthPage key="reset" mode="reset-password" />} />
+          {/* Invite accept — public page, no layout wrapper needed */}
+          <Route path="/collaboration/join" element={<CollabJoinPage />} />
 
           <Route element={<RequireAccount />}>
             <Route element={<AppLayout />}>
@@ -39,6 +44,8 @@ export default function App() {
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/bin" element={<BinPage />} />
               <Route path="/spaces/:spaceId" element={<SpacePage />} />
+              <Route path="/collaboration" element={<CollaborationPage />} />
+              <Route path="/collaboration/:taskId" element={<CollabTaskPage />} />
             </Route>
           </Route>
 

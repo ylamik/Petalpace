@@ -53,9 +53,9 @@ export default function ActivityHeatmap({compact=false}:{compact?:boolean}) {
     </div>
     {!compact && <div className="mt-5 flex items-center justify-end gap-2 text-xs text-gray" aria-label="Darker green means more tasks completed"><span className="mr-1">Fewer</span>{shades.map(shade=><span key={shade} className="h-3.5 w-3.5 rounded-sm" style={{backgroundColor:shade}}/>)}<span className="ml-1">More</span></div>}
     </div>
-    {compact ? <div className="mt-4 grid grid-cols-2 divide-x divide-dark-blue/10"><div><p className="text-2xl font-semibold">{total}</p><p className="text-xs">tasks completed</p></div><div className="pl-3"><p className="text-2xl font-semibold">{active}</p><p className="text-xs">days with activity</p></div></div> : <div className="mt-7 grid grid-cols-2 border-t border-dark-blue/25 pt-6 text-center">
-      <div className="border-r border-dark-blue/25 px-2"><p className="text-base sm:text-2xl">Tasks completed</p><p className="mt-1 text-3xl font-semibold sm:text-4xl">{total}</p></div>
-      <div className="px-2"><p className="text-base sm:text-2xl">Days with activity</p><p className="mt-1 text-3xl font-semibold sm:text-4xl">{active}</p></div>
+    {compact ? <div className="mt-4 grid grid-cols-2 divide-x divide-dark-blue/10"><div><p className="text-xl font-semibold">{total}</p><p className="text-xs text-gray">tasks completed</p></div><div className="pl-3"><p className="text-xl font-semibold">{active}</p><p className="text-xs text-gray">days with activity</p></div></div> : <div className="mt-7 grid grid-cols-2 border-t border-dark-blue/25 pt-6 text-center">
+      <div className="border-r border-dark-blue/25 px-2"><p className="text-sm text-gray sm:text-base">Tasks completed</p><p className="mt-1 text-2xl font-semibold sm:text-3xl">{total}</p></div>
+      <div className="px-2"><p className="text-sm text-gray sm:text-base">Days with activity</p><p className="mt-1 text-2xl font-semibold sm:text-3xl">{active}</p></div>
     </div>}
 
   </div>
