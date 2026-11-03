@@ -224,7 +224,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
                   <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-light-gray/50">
                     <img src="/icons/link.svg" alt="" className="h-4 w-4 object-contain" />
                   </span>
-                  <a href={link} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 break-all text-sm text-link underline">{link}</a>
+                  <a href={link} target="_blank" rel="noopener noreferrer" title={link} className="min-w-0 flex-1 truncate text-sm text-link underline">{link}</a>
                   <button type="button" aria-label={`Remove link ${link}`} onClick={() => setLinks((current) => current.filter((item) => item !== link))} className="min-h-10 text-xs text-link hover:underline">Remove</button>
                 </li>
               ))}
