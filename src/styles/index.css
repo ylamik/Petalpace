@@ -1,0 +1,195 @@
+@import url("https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Story+Script&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #ffffff;
+  --color-surface: #ffffff;
+  --color-page: #faf7ef;
+  --color-link: #4c74a1;
+  --color-action-hover: #2f3c74;
+  --color-danger: #b12b26;
+  --color-panel-blue: #f4f8ff;
+  --color-panel-green: #e6eadd;
+  --color-done-card: #e2ebdc;
+  --color-done-hover: #d4e2cb;
+  --color-done-badge: #cfe4d3;
+  --color-done-ink: #2f573c;
+  --color-done-stroke: #426650;
+  --color-star: #807d00;
+  --color-dark-blue: #2f3c74;
+  --color-blue: #4c74a1;
+  --color-light-blue: #0968f3;
+  --color-lightest-blue: #ccdbef;
+  --color-beige: #f2eadb;
+  --color-light-pink: #fdece4;
+  --color-light-yellow: #fef4dc;
+  --color-light-green: #eaefe3;
+  --color-light-red: #f9d6c8;
+  --color-red: #b12b26;
+  --color-light-orange: #f8e0ad;
+  --color-orange: #934b04;
+  --color-light-gray: #e0e2dc;
+  --color-gray: #5f5f5f;
+
+  --font-serif: "STIX Two Text", Georgia, serif;
+  --font-story: "Story Script", cursive;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-dark-blue);
+  font-family: var(--font-serif);
+}
+
+/* Clip the petals to the hero and allow clicks through them. */
+.petal-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Each track is the full height of the hero. */
+.petal-track {
+  position: absolute;
+  top: 0;
+  width: var(--petal-size);
+  height: 100%;
+  animation: petal-fall var(--petal-duration) linear infinite;
+  animation-delay: var(--petal-delay);
+}
+
+.floating-petal {
+  display: block;
+  width: 100%;
+  height: auto;
+  opacity: 0.45;
+  animation: petal-turn var(--petal-duration) ease-in-out infinite;
+  animation-delay: var(--petal-delay);
+}
+
+@keyframes petal-fall {
+  0% {
+    transform: translate3d(0, -12%, 0);
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate3d(var(--petal-drift), 105%, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes petal-turn {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(var(--petal-turn));
+  }
+}
+
+/* Fewer petals on small screens. */
+@media (max-width: 767px) {
+  .flower-track {
+    width: calc(var(--petal-size) * 0.75);
+  }
+}
+
+/* Respect the user's reduced-motion setting. */
+@media (prefers-reduced-motion: reduce) {
+  .petal-layer {
+    display: none;
+  }
+
+  /* Keep the flowers softer than the main illustration. */
+  .floating-flower {
+    opacity: 1;
+  }
+}
+
+/* Nav progress bar animation */
+@keyframes navprogress {
+  0%   { transform: translateX(-100%); }
+  60%  { transform: translateX(150%); }
+  100% { transform: translateX(150%); }
+}
+
+/* Clear interactive affordances and room around native-select chevrons. */
+button:not(:disabled), a[href], select:not(:disabled), summary, [role="button"], input[type="checkbox"], input[type="radio"] { cursor: pointer; }
+button:disabled, select:disabled { cursor: not-allowed; }
+select { appearance: none; padding-right: 2.5rem !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232F3C74' stroke-width='1.8'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .8rem center; }
+
+/* Separate surfaces, readable text, and action colors: photos and space colors stay intact. */
+:root {
+  color-scheme: light;
+  --heat-0: #eff1eb;
+  --heat-1: #d7e2ce;
+  --heat-2: #bdcfb4;
+  --heat-3: #9bb78c;
+  --heat-4: #6e8c5e;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-canvas: #151e29;
+  --color-surface: #202c3a;
+  --color-page: #18232e;
+  --color-dark-blue: #e5eaf3;
+  --color-link: #abcdf4;
+  --color-action-hover: #365c85;
+  --color-beige: #2d3032;
+  --color-lightest-blue: #354d68;
+  --color-light-blue: #accfff;
+  --color-light-pink: #403033;
+  --color-light-yellow: #3c3729;
+  --color-light-green: #2c3c34;
+  --color-light-red: #4d3035;
+  --color-red: #ffb4a8;
+  --color-light-orange: #493b28;
+  --color-orange: #f4ca83;
+  --color-light-gray: #363e47;
+  --color-gray: #b9c2ce;
+  --color-panel-blue: #24354a;
+  --color-panel-green: #303e36;
+  --color-done-card: #293f34;
+  --color-done-hover: #35523f;
+  --color-done-badge: #375b43;
+  --color-done-ink: #c5e8ca;
+  --color-done-stroke: #87b394;
+  --color-star: #e9cf73;
+  --heat-0: #303c37;
+  --heat-1: #455e46;
+  --heat-2: #5b7955;
+  --heat-3: #7a9c6f;
+  --heat-4: #accb9c;
+}
+:root[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E5EAF3' stroke-width='1.8'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+:root[data-theme="dark"] img[src*="petalpace-logo"] {
+  filter: brightness(0) saturate(100%) invert(95%) sepia(12%) saturate(342%) hue-rotate(338deg);
+}
+:root[data-theme="dark"] img[src^="/icons/"] { filter: brightness(0) saturate(100%) invert(86%) sepia(15%) saturate(540%) hue-rotate(179deg); }
+/* Artwork printed on pale paper keeps dark ink instead of white-on-pastel text. */
+:root[data-theme="dark"] .paper-art {
+  --color-dark-blue: #2f3c74;
+  --color-gray: #5f5f5f;
+  --color-page: #faf7ef;
+  --color-surface: #fffcf8;
+  color: #2f3c74;
+}
+:root[data-theme="dark"] .paper-art img[src^="/icons/"] { filter: none; }
+:root[data-theme="dark"] dialog::backdrop { background: rgb(0 0 0 / .6); }
+::selection { background: var(--color-lightest-blue); color: var(--color-dark-blue); }
