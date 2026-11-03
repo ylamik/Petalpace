@@ -7,9 +7,7 @@ A calm, personal planning app for anyone who wants to stay on top of their days.
 ---
 
 ## Overview
-
-<!-- Screenshot: Landing / homepage hero -->
-> **\<insert screenshot — Homepage hero with "Room for your plans"\>**
+ <img width="957" height="469" alt="image" src="https://github.com/user-attachments/assets/0f6ad025-53fb-49e6-bf36-4f467f520974" />
 
 Petalpace is a full-stack web app with real user accounts, persistent storage, real-time cross-device sync, and a clean interface designed to feel easy rather than overwhelming.
 
@@ -20,21 +18,29 @@ Petalpace is a full-stack web app with real user accounts, persistent storage, r
 ### Home
 The public landing page. Explains what Petalpace is and lets visitors sign up or sign in.
 
-> **\<insert screenshot — HomePage full view\>**
+<img width="948" height="452" alt="image" src="https://github.com/user-attachments/assets/3ff84c0c-090d-46ad-a3c0-1cc94c58a7de" />
+<img width="956" height="470" alt="image" src="https://github.com/user-attachments/assets/ebaa1406-3429-41ec-88b7-b61d7cdbeaeb" />
+<img width="958" height="417" alt="image" src="https://github.com/user-attachments/assets/d6afbac4-f362-432f-a4d5-388ccb46ed3a" />
+<img width="959" height="442" alt="image" src="https://github.com/user-attachments/assets/c169010c-fc77-4091-bfd8-a681d009a637" />
+<img width="958" height="470" alt="image" src="https://github.com/user-attachments/assets/f88eb662-8aba-472e-89f0-40209f754744" />
+<img width="958" height="470" alt="image" src="https://github.com/user-attachments/assets/b6a972f2-535b-4276-ad5c-b7de5b0322c8" />
 
 ---
 
 ### Sign up / Sign in
 Secure account registration with email verification. Password reset is handled by a single-use email link (expires in 30 minutes).
 
-> **\<insert screenshot — Sign in page\>**
+<img width="596" height="418" alt="image" src="https://github.com/user-attachments/assets/cfc92a7e-8f9a-4a1b-bfd0-cba6de598865" />
+
 
 ---
 
 ### Today
 Your daily view. Shows tasks due today, overdue unfinished tasks, and undated unfinished tasks. Pinned tasks appear in **My top 3** at the top for quick focus.
 
-> **\<insert screenshot — Today page with top 3 cards and task list\>**
+<img width="959" height="472" alt="image" src="https://github.com/user-attachments/assets/eb841354-5961-4ebb-9bc9-ebb68e5c1434" />
+<img width="957" height="470" alt="image" src="https://github.com/user-attachments/assets/2394a289-3c3e-4706-a704-319416e237d4" />
+
 
 - Quick-add bar to create a task in seconds
 - My top 3 — pin up to three tasks as your priority for the day
@@ -46,7 +52,7 @@ Your daily view. Shows tasks due today, overdue unfinished tasks, and undated un
 ### Upcoming
 All tasks with a future deadline, grouped by date on a timeline. Missed deadlines and completed tasks have collapsible sections.
 
-> **\<insert screenshot — Upcoming page with date timeline\>**
+<img width="959" height="471" alt="image" src="https://github.com/user-attachments/assets/888dccac-3c36-464a-a7e4-fdd8dff367ee" />
 
 - Filter by space, status, deadline range, or search by title
 - "Tasks ahead" sidebar counts unfinished tasks per space
@@ -57,7 +63,7 @@ All tasks with a future deadline, grouped by date on a timeline. Missed deadline
 ### All Tasks
 Every task across all spaces in one filterable list, with the mountains illustration beside the header.
 
-> **\<insert screenshot — All Tasks page with filters\>**
+<img width="959" height="473" alt="image" src="https://github.com/user-attachments/assets/3e5f7095-3d43-4e4f-8aa8-a27575ca1486" />
 
 - Filter by space, status, priority, or deadline
 - Sort by nearest deadline, farthest, priority, or title A–Z
@@ -69,8 +75,8 @@ Every task across all spaces in one filterable list, with the mountains illustra
 ### Calendar
 A full calendar showing tasks on their due dates. Supports month, week, day, and year views.
 
-> **\<insert screenshot — Calendar month view\>**
-> **\<insert screenshot — Calendar week view\>**
+<img width="959" height="472" alt="image" src="https://github.com/user-attachments/assets/e492189c-67d6-43e8-a7ac-49f9d46b8d35" />
+<img width="959" height="470" alt="image" src="https://github.com/user-attachments/assets/760b0e1e-69f1-4ece-a372-979352b596c1" />
 
 - Click any date to drill into day view
 - Click `+` on a date to add a task with that due date pre-filled
@@ -82,7 +88,8 @@ A full calendar showing tasks on their due dates. Supports month, week, day, and
 ### Spaces
 Tasks are organised into spaces — named and coloured categories you define (Work, Personal, Creative, Health, or anything that fits your life). Each space has its own page.
 
-> **\<insert screenshot — Space page\>**
+<img width="958" height="468" alt="image" src="https://github.com/user-attachments/assets/87465c44-5080-496d-b05f-7dc04a6daac9" />
+<img width="959" height="472" alt="image" src="https://github.com/user-attachments/assets/f2baa8ec-6af2-4aae-814d-533f086d3f0c" />
 
 - Create a space with a name and colour from the palette or a custom hex
 - **Edit** a space's name or colour at any time — pencil icon appears on hover in the sidebar, or use the "Edit space" button on the space page
@@ -95,7 +102,9 @@ Tasks are organised into spaces — named and coloured categories you define (Wo
 ### Task details
 Opening any task slides open a detail panel on the right.
 
-> **\<insert screenshot — Task details panel open\>**
+<img width="958" height="472" alt="image" src="https://github.com/user-attachments/assets/5504051c-aa4f-4f73-9ca3-1d0f4a8838ae" />
+<img width="958" height="476" alt="image" src="https://github.com/user-attachments/assets/5b22e08f-3fa0-4f0c-b664-7482332dc9e2" />
+
 
 Everything you can store on a task:
 - Title (up to 160 characters) — warns if a duplicate title already exists
@@ -113,7 +122,7 @@ Everything you can store on a task:
 ### Bin
 Deleted tasks are kept for 30 days before permanent removal.
 
-> **\<insert screenshot — Bin page\>**
+<img width="959" height="451" alt="image" src="https://github.com/user-attachments/assets/22048be3-3f02-4884-87c0-1c69b06fbd9b" />
 
 - Restore a task to its original space (or choose a replacement if the space was deleted)
 - Select multiple tasks to restore or permanently delete together
@@ -124,7 +133,7 @@ Deleted tasks are kept for 30 days before permanent removal.
 ### Progress (heatmap)
 An activity heatmap recording each day you completed tasks.
 
-> **\<insert screenshot — Progress heatmap full view\>**
+<img width="954" height="455" alt="image" src="https://github.com/user-attachments/assets/fe605b66-0647-400f-b399-7f79b67b55a2" />
 
 - 4-week, 12-week, and 26-week range views
 - Colour intensity reflects how many tasks you completed that day
