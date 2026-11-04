@@ -63,3 +63,30 @@ test('authenticated SSE opens once and broadcasts without duplicate headers',asy
  const timeout=setTimeout(()=>abort.abort(),3000)
  try{assert.match(new TextDecoder().decode((await reader.read()).value),/planner-changed/)}finally{clearTimeout(timeout);abort.abort();await reader.cancel().catch(()=>{})}
 })
+
+test('delegated resources persist, editors edit unassigned work, limited members change only their status',async t=>{
+ const f=await fixture(t);let task=await f.create();const path='/api/collab/tasks/'+task.id
+ f.db.prepare('INSERT INTO collab_members VALUES(?,?,?,?)').run(task.id,'u1','editor',Date.now())
+ f.db.prepare('INSERT INTO collab_members VALUES(?,?,?,?)').run(task.id,'u2','steps',Date.now())
+ let result=await f.request(path,'PUT',{revision:task.revision,subtasks:[{title:'Research',done:false,assignedTo:'u2',notes:'Brief',links:['https://example.com/source']}],links:['https://example.com/group']},1)
+ assert.equal(result.status,200,JSON.stringify(result.body));task=result.body.task
+ assert.equal(task.subtasks[0].notes,'Brief');assert.deepEqual(task.subtasks[0].links,['https://example.com/source'])
+ const edit=patch=>f.request(path,'PUT',{revision:task.revision,...patch},2)
+ assert.equal((await edit({subtasks:task.subtasks.map(s=>({...s,notes:'unauthorized'}))})).status,403)
+ assert.equal((await edit({subtasks:task.subtasks.map(s=>({...s,links:['https://example.com/other']}))})).status,403)
+ assert.equal((await edit({files:[]})).status,403)
+ result=await edit({subtasks:task.subtasks.map(s=>({...s,done:true}))});assert.equal(result.status,200);task=result.body.task
+ const sharp=(await import('sharp')).default
+ const data=(await sharp({create:{width:2,height:2,channels:3,background:'#ffffff'}}).png().toBuffer()).toString('base64')
+ const file={name:'reference.png',type:'image/png',data,lastModified:1,subtaskId:task.subtasks[0].id}
+ assert.equal((await f.request(path,'PUT',{revision:task.revision,files:[{...file,data:Buffer.from('invalid').toString('base64')}]},1)).status,400)
+ result=await f.request(path,'PUT',{revision:task.revision,files:[file],notes:'Editor may change group notes'},1)
+ assert.equal(result.status,200,JSON.stringify(result.body));task=result.body.task
+ const saved=(await f.request(path,'GET',undefined,2)).body.task
+ assert.equal(saved.files[0].subtaskId,task.subtasks[0].id)
+ assert.equal(saved.subtasks[0].notes,'Brief');assert.equal(saved.links[0].url,'https://example.com/group')
+ assert.equal((await f.request(path,'PUT',{revision:task.revision,subtasks:task.subtasks.map(s=>({...s,links:['javascript:alert(1)']}))},1)).status,400)
+ result=await f.request(path,'PUT',{revision:task.revision,subtasks:[]},1)
+ assert.equal(result.status,200);assert.equal(result.body.task.files.length,0);assert.equal(result.body.task.links.length,1)
+ assert.equal((await f.request(path+'/members/u2','PATCH',{permission:'editor'},1)).status,403)
+})

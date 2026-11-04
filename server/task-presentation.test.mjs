@@ -92,6 +92,7 @@ test('missed deadlines form a separate group, preserve status, and move after co
   assert.deepEqual(groups.missed.map(t=>t.id),['past','timed'])
   assert.deepEqual(groups.completed.map(t=>t.id),['done'])
   assert.equal(groups.missed[0].started,true)
+  assert.equal(groupTasksByDeadline([{...past,...statusChange('blocked')}],now).missed.length,1)
   assert.equal(groupTasksByDeadline([{...past,done:true}],now).completed.length,1)
   assert.equal(groupTasksByDeadline([{...past,dueDate:'2026-11-03'}],now).active.length,1)
   assert.equal(groupTasksByDeadline([timed],new Date(2026,10,2,11,58)).active.length,1)

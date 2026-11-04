@@ -36,6 +36,11 @@
   --font-story: "Story Script", cursive;
 }
 
+/* Keep page width steady when a modal locks scrolling. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background: var(--color-canvas);
@@ -192,4 +197,5 @@ select { appearance: none; padding-right: 2.5rem !important; background-image: u
 }
 :root[data-theme="dark"] .paper-art img[src^="/icons/"] { filter: none; }
 :root[data-theme="dark"] dialog::backdrop { background: rgb(0 0 0 / .6); }
+:root[data-theme="dark"] #planner-mobile-menu::backdrop { background: rgb(0 0 0 / .05); }
 ::selection { background: var(--color-lightest-blue); color: var(--color-dark-blue); }

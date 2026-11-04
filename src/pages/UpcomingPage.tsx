@@ -38,6 +38,7 @@ export default function UpcomingPage() {
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [priority, setPriority] = useState("all");
   const [deadline, setDeadline] = useState("all");
   const [sort, setSort] = useState("nearest");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export default function UpcomingPage() {
         isDeadlineOverdue(task, now)) &&
       task.title.toLowerCase().includes(search.trim().toLowerCase()) &&
       (status === "all" || getStatus(task) === status) &&
+      (priority === "all" || task.priority === priority) &&
       matchesDeadline(task, deadline) &&
       (spaceFilter === "all" || task.space === spaceFilter),
   );
@@ -246,6 +248,7 @@ export default function UpcomingPage() {
               { value: "blocked", label: "Blocked" },
             ]}
           />
+          <PlannerSelect priorityIcons label="Filter by priority" value={priority} onChange={setPriority} options={[{value:"all",label:"Any priority"},{value:"High",label:"High"},{value:"Medium",label:"Medium"},{value:"Low",label:"Low"}]}/>
           <PlannerSelect
             label="Filter by deadline"
             value={deadline}

@@ -30,6 +30,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
   const [finished, setFinished] = useState(false)
   const token = new URLSearchParams(location.hash.slice(1)).get('token') || ''
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [notice, setNotice] = useState('')
 
   async function submit(resend = false) {
@@ -282,7 +283,23 @@ export default function AuthPage({ mode }: AuthPageProps) {
 
               {newPassword && <div>
                 <label htmlFor="auth-confirm" className="block text-sm font-semibold">Confirm password</label>
-                <input id="auth-confirm" name="confirmPassword" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required maxLength={128} className={inputClass} />
+                <div className="relative">
+                  <input id="auth-confirm" name="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} autoComplete="new-password" required maxLength={128} className={`${inputClass} pr-12`} />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(visible => !visible)}
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    aria-pressed={showConfirmPassword}
+                    aria-controls="auth-confirm"
+                    className="absolute inset-y-0 right-0 flex w-11 cursor-pointer items-center justify-center rounded-r-md text-gray hover:text-dark-blue focus-visible:outline-2 focus-visible:outline-blue"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                      <circle cx="12" cy="12" r="3" />
+                      {showConfirmPassword && <path d="m3 3 18 18" />}
+                    </svg>
+                  </button>
+                </div>
               </div>}
 
               {(isVerify || isReset) && !token && <p className="text-sm text-red">Open the link from your email. If it expired, request another one.</p>}

@@ -42,7 +42,6 @@ export default function CollabTaskPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [invitePermission,setInvitePermission]=useState('steps')
-  const [fileStep,setFileStep]=useState('')
   const [syncing,setSyncing]=useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteMsg, setInviteMsg] = useState('')
@@ -51,9 +50,8 @@ export default function CollabTaskPage() {
   const [memberToRemove,setMemberToRemove]=useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [stepToRemove,setStepToRemove]=useState<CollabSubtask | null>(null)
   const [newSubtask, setNewSubtask] = useState('')
-  const [linkInput, setLinkInput] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
 
   const isOwner = task?.ownerId === user?.id
   const canEdit=isOwner || task?.members.find(m=>m.id===user?.id)?.role==='editor'
@@ -99,28 +97,29 @@ export default function CollabTaskPage() {
 
   async function removeSubtask(s: CollabSubtask) {
     if (!task) return
-    await save({ subtasks: task.subtasks.filter(item => item.id !== s.id) })
+    setStepToRemove(s)
   }
 
-  async function addLink() {
-    if (!task || !linkInput.trim()) return
+  async function addLink(value: string, step?: CollabSubtask) {
+    if (!task || !value.trim()) return
     try {
-      const url = new URL(linkInput.trim())
+      const url = new URL(value.trim())
       if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
-      const links = [...task.links.map(l => l.url), url.href]
-      if(await save({ links }))setLinkInput('')
+      return step
+        ? await save({subtasks:task.subtasks.map(s=>s.id===step.id?{...s,links:[...(s.links || []),url.href]}:s)})
+        : await save({links:[...task.links.map(l=>l.url),url.href]})
     } catch { setSaveError('Enter a valid link starting with https:// or http://.') }
   }
-
-  async function removeLink(id: string) {
+  async function removeLink(id: string, step?: CollabSubtask) {
     if (!task) return
-    await save({ links: task.links.filter(l => l.id !== id).map(l => l.url) })
+    if(step) await save({subtasks:task.subtasks.map(s=>s.id===step.id?{...s,links:(s.links || []).filter((_,i)=>String(i)!==id)}:s)})
+    else await save({ links: task.links.filter(l => l.id !== id).map(l => l.url) })
   }
 
-  async function uploadFiles(selected: File[]) {
+  async function uploadFiles(selected: File[], stepId?:string) {
     if (!task) return
-    const valid = selected.filter(f => /\.(pdf|docx?|pptx?)$/i.test(f.name) && f.size <= 10 * 1024 * 1024)
-    if (valid.length!==selected.length || !valid.length) { setSaveError('Use PDF, Word, or PowerPoint files up to 10 MB each.'); return }
+    const valid = selected.filter(f => /\.(pdf|docx?|pptx?|png|jpe?g|webp)$/i.test(f.name) && f.size <= 10 * 1024 * 1024)
+    if (valid.length!==selected.length || !valid.length) { setSaveError('Use documents or PNG, JPEG, WebP images up to 10 MB each.'); return }
     let encoded
     try{encoded = await Promise.all(valid.map(f => new Promise<{name:string;type:string;data:string;lastModified:number}>((resolve, reject) => {
       const reader = new FileReader()
@@ -128,7 +127,7 @@ export default function CollabTaskPage() {
       reader.onload = () => resolve({ name: f.name, type: f.type, lastModified: f.lastModified, data: String(reader.result).split(',')[1] })
       reader.readAsDataURL(f)
     })))}catch{setSaveError('Could not read the selected file. Please try again.');return}
-    await save({ files: [...task.files.map(f=>({...f,data:''})),...encoded.map(f=>({...f,subtaskId:fileStep || null}))] })
+    await save({ files: [...task.files.map(f=>({...f,data:''})),...encoded.map(f=>({...f,subtaskId:stepId || null}))] })
   }
 
   async function removeFile(id: string) {
@@ -164,6 +163,16 @@ export default function CollabTaskPage() {
     </div>
   )
   if (!task) return null
+
+  function resources(step?: CollabSubtask) {
+    if(!task) return null
+    return <SharedResources
+      files={task.files.filter(f=>(f.subtaskId || null)===(step?.id || null))}
+      links={step?(step.links || []).map((url,i)=>({id:String(i),url})):task.links}
+      taskId={task.id} canEdit={!!canEdit} saving={saving}
+      upload={files=>uploadFiles(files,step?.id)} addLink={url=>addLink(url,step)}
+      removeFile={removeFile} removeLink={id=>removeLink(id,step)}/>
+  }
 
   const currentStatus = statusOptions.find(s => s.value === task.status) ?? statusOptions[0]
   const completedCount = task.subtasks.filter(s => s.done).length
@@ -210,6 +219,11 @@ export default function CollabTaskPage() {
       </header>
 
       {canEdit && <section className="mt-4 rounded-xl border border-dark-blue/15 bg-surface p-5"><h2 className="mb-3 font-semibold">Edit task details</h2><SharedDetails key={task.id} task={task} save={save}/></section>}
+      <section className="mt-4 rounded-xl border border-dark-blue/15 bg-surface p-5">
+        <h2 className="font-bold">Group resources</h2>
+        <p className="mb-3 mt-1 text-sm text-gray">Files and links for the whole group. Resources for a delegated task belong inside that task below.</p>
+        {resources()}
+      </section>
       {canEdit && <label className="mt-4 block text-sm">Task assignee<select value={task.assignedTo || ''} disabled={saving} onChange={e=>void save({assignedTo:e.target.value || null})} className="ml-2 min-h-10 max-w-full rounded border border-dark-blue/20 bg-surface px-3"><option value="">Unassigned</option>{task.members.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
         {/* Main column */}
@@ -223,7 +237,7 @@ export default function CollabTaskPage() {
           {/* Subtasks */}
           <section className="rounded-xl border border-dark-blue/15 bg-surface p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="font-bold">Subtasks</h2>
+              <h2 className="font-bold">Delegated tasks</h2>
               <span className="text-xs text-gray">{completedCount}/{task.subtasks.length} done</span>
             </div>
             {task.subtasks.length > 0 && (
@@ -231,9 +245,10 @@ export default function CollabTaskPage() {
                 <div className="h-full rounded-full bg-[#91AE87] transition-all" style={{ width: `${task.subtasks.length ? (completedCount / task.subtasks.length) * 100 : 0}%` }} />
               </div>
             )}
-            <ul className="mt-4 divide-y divide-dark-blue/10">
+            <p className="mt-3 text-sm text-gray">Divide the work and assign each item to a member. Open an item’s notes and resources below.</p>
+            <ul className="mt-4 space-y-3">
               {task.subtasks.map(s => (
-                <li key={s.id} className="flex flex-wrap items-center gap-3 py-3">
+                <li key={s.id} className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-dark-blue/15 bg-beige/20 p-3">
                   <input
                     type="checkbox"
                     disabled={saving || (!canEdit && (!['member','steps'].includes(currentRole || '') || s.assignedTo!==user?.id))}
@@ -250,8 +265,16 @@ export default function CollabTaskPage() {
                     </span>
                   )}
                   {canEdit && (
-                    <button type="button" onClick={() => removeSubtask(s)} aria-label={`Remove subtask: ${s.title}`} className="shrink-0 rounded px-2 text-xs text-red hover:bg-light-red/30">Remove</button>
+                    <button type="button" onClick={() => removeSubtask(s)} aria-label={`Remove delegated task: ${s.title}`} className="shrink-0 rounded px-2 text-xs text-red hover:bg-light-red/30">Remove</button>
                   )}
+                  <details className="w-full min-w-0 border-t border-dark-blue/10 pt-3">
+                    <summary className="cursor-pointer text-sm font-medium text-link">Notes &amp; resources ({task.files.filter(f=>f.subtaskId===s.id).length+(s.links?.length || 0)})</summary>
+                    <div className="mt-3 space-y-4">
+                      {canEdit && <NoteEditor singleLine value={s.title} revision={task.revision} onSave={(title,revision)=>save({revision,subtasks:task.subtasks.map(item=>item.id===s.id?{...item,title}:item)})}/>}
+                      {canEdit ? <NoteEditor value={s.notes || ''} revision={task.revision} onSave={(notes,revision)=>save({revision,subtasks:task.subtasks.map(item=>item.id===s.id?{...item,notes}:item)})}/> : <p className="whitespace-pre-wrap break-words text-sm">{s.notes || 'No notes yet.'}</p>}
+                      {resources(s)}
+                    </div>
+                  </details>
                 </li>
               ))}
             </ul>
@@ -259,7 +282,7 @@ export default function CollabTaskPage() {
               <input
                 value={newSubtask}
                 onChange={e => setNewSubtask(e.target.value)}
-                placeholder="Add a subtask…"
+                placeholder="Add a delegated task…"
                 maxLength={500}
                 className="min-h-10 min-w-0 flex-1 rounded-lg border border-dark-blue/20 bg-surface px-3 text-sm focus-visible:outline-blue"
               />
@@ -267,51 +290,7 @@ export default function CollabTaskPage() {
             </form>}
           </section>
 
-          {/* Files & links */}
-          <section className="rounded-xl border border-dark-blue/15 bg-surface p-5">
-            <h2 className="mb-4 font-bold">Files &amp; links</h2>
-            <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx" className="hidden" onChange={e => { void uploadFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
-            <select aria-label="Attach file to subtask" disabled={!canEdit} value={fileStep} onChange={e=>setFileStep(e.target.value)} className="mb-3 min-h-10 w-full rounded border border-dark-blue/20 bg-surface px-2 text-sm"><option value="">Whole task</option>{task.subtasks.map(step=><option key={step.id} value={step.id}>{step.title}</option>)}</select>
-            <button disabled={!canEdit || saving} type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-blue/20 bg-surface px-3 py-2 text-sm text-link hover:bg-lightest-blue/20">Upload file</button>
-            <p className="mt-1 text-xs text-gray">PDF, DOC, DOCX, PPT, PPTX · up to 10 MB each</p>
 
-            {task.files.length > 0 && (
-              <ul className="mt-3 space-y-2">
-                {task.files.map(f => (
-                  <li key={f.id} className="flex items-center gap-2 rounded-lg border border-dark-blue/20 bg-surface p-2">
-                    <FileTypeIcon filename={f.name} className="h-9 w-10" />
-                    <a href={`/api/collab/tasks/${task.id}/files/${f.id}`} download className="min-w-0 flex-1 truncate text-sm text-link underline" title={f.name}>{f.name}{f.subtaskId ? ` · ${task.subtasks.find(s=>s.id===f.subtaskId)?.title || 'Subtask'}` : ''}</a>
-                    <button type="button" disabled={!canEdit || saving} onClick={() => void removeFile(f.id)} aria-label={`Remove ${f.name}`} className="shrink-0 rounded px-2 text-xs text-red hover:bg-light-red/30">Remove</button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <div className="mt-4 flex gap-2">
-              <input
-                type="url"
-                value={linkInput}
-                onChange={e => setLinkInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void addLink() } }}
-                placeholder="Paste a link (https://…)"
-                className="min-h-10 min-w-0 flex-1 rounded-lg border border-dark-blue/20 bg-surface px-3 text-sm focus-visible:outline-blue"
-              />
-              <button type="button" disabled={!canEdit || saving} onClick={() => void addLink()} className="rounded-lg bg-blue px-3 text-sm text-white hover:bg-action-hover">Add</button>
-            </div>
-            {task.links.length > 0 && (
-              <ul className="mt-3 space-y-2">
-                {task.links.map(l => (
-                  <li key={l.id} className="flex items-center gap-2 rounded-lg border border-dark-blue/20 bg-surface p-2">
-                    <span className="flex h-8 w-9 shrink-0 items-center justify-center rounded bg-light-gray/50">
-                      <img src="/icons/link.svg" alt="" className="h-4 w-4 object-contain" />
-                    </span>
-                    <a href={l.url} target="_blank" rel="noreferrer" title={l.url} className="min-w-0 flex-1 truncate text-xs text-link hover:underline">{l.url}</a>
-                    <button type="button" disabled={!canEdit || saving} onClick={() => void removeLink(l.id)} aria-label={`Remove link`} className="shrink-0 rounded px-2 text-xs text-red hover:bg-light-red/30">Remove</button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
         </div>
 
         {/* Sidebar column — members */}
@@ -322,7 +301,7 @@ export default function CollabTaskPage() {
               {task.members.map(m => (
                 <div key={m.id} className="group flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <MemberBadge member={m} />{isOwner && m.role!=='owner' && <select aria-label={`Permission for ${m.name}`} value={m.role==='member'?'steps':m.role} onChange={e=>{void collabApi.permission(task.id,m.id,e.target.value).then(r=>setTask(r.task)).catch(e=>setSaveError(e.message))}} className="mt-1 min-h-10 w-full rounded border border-dark-blue/20 bg-surface px-2 text-sm"><option value="editor">Editor</option><option value="steps">Assigned steps only</option><option value="viewer">View only</option></select>}
+                    <MemberBadge member={m} />{isOwner && m.role!=='owner' && <select aria-label={`Permission for ${m.name}`} value={m.role==='member'?'steps':m.role} onChange={e=>{void collabApi.permission(task.id,m.id,e.target.value).then(r=>setTask(r.task)).catch(e=>setSaveError(e.message))}} className="mt-1 min-h-10 w-full rounded border border-dark-blue/20 bg-surface px-2 text-sm"><option value="editor">Edit all content</option><option value="steps">Assigned status only</option><option value="viewer">View only</option></select>}
                   </div>
                   {isOwner && m.role !== 'owner' && (
                     <button type="button" onClick={() => setMemberToRemove(m.id)} aria-label={`Remove ${m.name}`} className="shrink-0 rounded px-1.5 text-xs text-red opacity-0 group-hover:opacity-100 hover:bg-light-red/30 focus-visible:opacity-100">Remove</button>
@@ -333,7 +312,7 @@ export default function CollabTaskPage() {
 
             {isOwner && (
               <div className="mt-4 border-t border-dark-blue/10 pt-4">
-                <p className="mb-2 text-sm font-medium">Invite by email</p><label className="block text-sm">Permission<select value={invitePermission} onChange={e=>setInvitePermission(e.target.value)} className="my-2 min-h-11 w-full rounded-lg border border-dark-blue/20 bg-surface px-2"><option value="steps">Assigned steps only</option><option value="editor">Editor</option><option value="viewer">View only</option></select></label><p className="mb-3 text-xs text-gray">Editors can change the task, steps, assignments and attachments. Assigned-step members can only mark their own steps done.</p>
+                <p className="mb-2 text-sm font-medium">Invite by email</p><label className="block text-sm">Permission<select value={invitePermission} onChange={e=>setInvitePermission(e.target.value)} className="my-2 min-h-11 w-full rounded-lg border border-dark-blue/20 bg-surface px-2"><option value="steps">Assigned status only</option><option value="editor">Edit all content</option><option value="viewer">View only</option></select></label><p className="mb-3 text-xs text-gray">Edit all content: change any task, notes, assignments, files and links—even when not assigned. Assigned status only: mark only their assigned items done or not done. View only: read and download. Only the owner manages members.</p>
                 <div className="flex gap-2">
                   <input
                     type="email"
@@ -368,6 +347,7 @@ export default function CollabTaskPage() {
         </aside>
       </div>
 
+      {stepToRemove && <ConfirmTaskDialog title="Remove delegated task?" message="This removes this item and its notes, links and attached files for every member." confirmLabel="Remove item" onCancel={()=>setStepToRemove(null)} onConfirm={async()=>{if(await save({subtasks:task.subtasks.filter(s=>s.id!==stepToRemove.id)}))setStepToRemove(null)}}/>}
       {memberToRemove && <ConfirmTaskDialog title="Remove this member?" message="Their access will end and their assignments will become unassigned. Their work stays in the task." confirmLabel="Remove member" onCancel={()=>setMemberToRemove(null)} onConfirm={()=>{void removeMember(memberToRemove).catch(e=>setSaveError(e.message));setMemberToRemove(null)}}/>}
       {pendingStatus && <ConfirmTaskDialog title={pendingStatus==='done'?'Mark shared task done?':'Reopen this shared task?'} message="This status change will be visible to every member." confirmLabel="Confirm change" onCancel={()=>setPendingStatus(null)} onConfirm={()=>{void save({status:pendingStatus});setPendingStatus(null)}}/>}
       {confirmDelete && (
@@ -400,7 +380,7 @@ export default function CollabTaskPage() {
   )
 }
 
-function NoteEditor({ value,revision, onSave }: { value: string;revision:number; onSave: (v: string,revision:number) => Promise<CollabTask | undefined> }) {
+function NoteEditor({ value,revision, onSave,singleLine=false }: { singleLine?:boolean;value: string;revision:number; onSave: (v: string,revision:number) => Promise<CollabTask | undefined> }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   // Reset draft when editing begins so it reflects the latest saved value
@@ -410,22 +390,23 @@ function NoteEditor({ value,revision, onSave }: { value: string;revision:number;
     return (
       <div className="group flex items-start justify-between gap-2">
         <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray">{value || 'No notes yet. Click Edit to add some.'}</p>
-        <button type="button" onClick={startEditing} className="shrink-0 rounded px-2 py-1 text-xs text-link opacity-0 group-hover:opacity-100 hover:bg-lightest-blue/30 focus-visible:opacity-100">✎ Edit</button>
+        <button type="button" onClick={startEditing} className="shrink-0 rounded px-2 py-1 text-sm text-link hover:bg-lightest-blue/30">✎ {singleLine ? "Edit title" : "Edit notes"}</button>
       </div>
     )
   }
   return (
     <div>
-      <textarea
+      {singleLine ? <label className="block text-sm">Delegated task title<input autoFocus required maxLength={500} value={draft} onChange={e=>setDraft(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-dark-blue/20 bg-surface px-3"/></label> : <textarea
+        aria-label="Notes"
         autoFocus
         value={draft}
         onChange={e => setDraft(e.target.value)}
         maxLength={20000}
         rows={5}
         className="block min-h-28 w-full rounded-lg border border-dark-blue/20 bg-surface px-3 py-2 text-sm focus-visible:outline-blue resize-y"
-      />
+      />}
       <div className="mt-2 flex gap-2">
-        <button type="button" onClick={() => { void onSave(draft,baseline.current).then(updated=>{if(updated)setEditing(false)}) }} className="min-h-9 rounded-lg bg-blue px-3 text-sm text-white hover:bg-action-hover">Save</button>
+        <button type="button" disabled={singleLine && !draft.trim()} onClick={() => { void onSave(draft,baseline.current).then(updated=>{if(updated)setEditing(false)}) }} className="min-h-9 rounded-lg bg-blue px-3 text-sm text-white hover:bg-action-hover">Save</button>
         <button type="button" onClick={() => { setDraft(value); setEditing(false) }} className="min-h-9 rounded-lg border border-blue px-3 text-sm text-link">Cancel</button>
       </div>
     </div>
@@ -438,4 +419,35 @@ function SharedDetails({task,save}:{task:CollabTask;save:(patch:CollabUpdatePayl
  const clean=title===task.title && date===task.dueDate && time===task.dueTime && priority===task.priority
  useEffect(()=>{if(clean)baseline.current=task.revision},[clean,task.revision])
  return <form onSubmit={e=>{e.preventDefault();void save({revision:baseline.current,title,dueDate:date,dueTime:date?time:'',priority}).then(updated=>{if(updated)baseline.current=updated.revision})}} className="grid gap-3 sm:grid-cols-2"><label className="text-sm sm:col-span-2">Title<input required maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} className="mt-1 min-h-11 w-full rounded border border-dark-blue/20 bg-surface px-3"/></label><label className="text-sm">Due date<input type="date" value={date} onChange={e=>setDate(e.target.value)} className="mt-1 min-h-11 w-full rounded border border-dark-blue/20 bg-surface px-3"/></label><label className="text-sm">Priority<select value={priority} onChange={e=>setPriority(e.target.value as CollabTask['priority'])} className="mt-1 min-h-11 w-full rounded border border-dark-blue/20 bg-surface px-3">{['High','Medium','Low'].map(p=><option key={p}>{p}</option>)}</select></label><div className="sm:col-span-2"><TimePicker value={time} onChange={setTime} disabled={!date}/><p className="text-xs text-gray">Timezone: {task.dueZone}</p></div><button className="min-h-11 justify-self-start rounded-lg bg-blue px-4 text-sm text-white">Save details</button></form>
+}
+
+function SharedResources({files,links,taskId,canEdit,saving,upload,addLink,removeFile,removeLink}: {
+  files:CollabTask['files'];links:CollabTask['links'];taskId:string;canEdit:boolean;saving:boolean;
+  upload:(files:File[])=>Promise<void>;addLink:(url:string)=>Promise<CollabTask | undefined>;
+  removeFile:(id:string)=>Promise<void>;removeLink:(id:string)=>Promise<void>;
+}) {
+  const [url,setUrl]=useState('')
+  return <div className="min-w-0 space-y-3">
+    {canEdit && <>
+      <label className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-blue/30 px-3 text-sm text-link hover:bg-lightest-blue/30 focus-within:outline-2 focus-within:outline-blue">
+        Upload file or image
+        <input aria-label="Upload file or image" disabled={saving} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp" className="sr-only" onChange={e=>{void upload(Array.from(e.target.files || []));e.target.value=''}}/>
+      </label>
+      <p className="text-xs text-gray">PDF, Word, PowerPoint, PNG, JPEG or WebP · 10 MB per file.</p>
+    </>}
+    {files.map(file=><div key={file.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-dark-blue/15 bg-surface p-2">
+      <FileTypeIcon filename={file.name} className="h-8 w-8 shrink-0"/>
+      <a href={`/api/collab/tasks/${taskId}/files/${file.id}`} download title={file.name} className="min-w-0 flex-1 truncate text-sm text-link underline">{file.name}</a>
+      {canEdit && <button disabled={saving} type="button" aria-label={`Remove ${file.name}`} onClick={()=>void removeFile(file.id)} className="min-h-10 shrink-0 rounded px-2 text-xs text-red hover:bg-light-red/30">Remove</button>}
+    </div>)}
+    {canEdit && <form onSubmit={e=>{e.preventDefault();void addLink(url).then(result=>{if(result)setUrl('')})}} className="flex flex-wrap gap-2">
+      <input aria-label="Resource link" type="url" required maxLength={2048} value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a link (https://…)" className="min-h-11 min-w-0 flex-1 rounded-lg border border-dark-blue/20 bg-surface px-3 text-sm"/>
+      <button disabled={saving || !url.trim()} className="min-h-11 rounded-lg bg-blue px-3 text-sm text-white disabled:opacity-50">Add link</button>
+    </form>}
+    {links.map(link=><div key={link.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-dark-blue/15 bg-surface p-2">
+      <a href={link.url} target="_blank" rel="noreferrer" title={link.url} className="min-w-0 flex-1 truncate text-sm text-link underline">{link.url}</a>
+      {canEdit && <button disabled={saving} type="button" onClick={()=>void removeLink(link.id)} className="min-h-10 shrink-0 rounded px-2 text-xs text-red hover:bg-light-red/30">Remove</button>}
+    </div>)}
+    {!files.length && !links.length && <p className="text-sm text-gray">No resources added yet.</p>}
+  </div>
 }

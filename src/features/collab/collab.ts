@@ -14,6 +14,8 @@ export interface CollabSubtask {
   title: string
   done: boolean
   assignedTo: string | null
+  notes?: string
+  links?: string[]
   position: number
 }
 

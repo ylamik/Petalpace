@@ -85,7 +85,9 @@ export function createAuthStore(path = ':memory:') {
     ['collab_tasks','due_zone',"TEXT NOT NULL DEFAULT 'Asia/Manila'"],
     ['collab_tasks','assigned_to','TEXT'],
     ['collab_invites','permission',"TEXT NOT NULL DEFAULT 'steps'"],
-    ['collab_files','subtask_id','TEXT']
+    ['collab_files','subtask_id','TEXT'],
+    ['collab_subtasks','notes',"TEXT NOT NULL DEFAULT ''"],
+    ['collab_subtasks','links',"TEXT NOT NULL DEFAULT '[]'"]
   ]) { if(!db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`) }
   return db
 }
