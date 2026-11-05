@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mergePlanner } from '../src/features/spaces/mergePlanner.ts'
+import { mergePlanner, applyLocalVersion, describeConflict } from '../src/features/spaces/mergePlanner.ts'
 
 const space = { id: 'school', name: 'School', color: '#D7E7FD' }
+const work = { id: 'work', name: 'Work', color: '#123456' }
+const home = { id: 'home', name: 'Home', color: '#654321' }
 const task = (id, changes = {}) => ({ id, title: `Task ${id}`, spaceId: 'school', space: 'School', done: false, pinned: false, files: [], ...changes })
 const base = { spaces: [space], tasks: [task('a'), task('b'), task('c')] }
 
@@ -29,12 +31,72 @@ test('a local delete of an unchanged task sticks even though it is still on the 
   assert.deepEqual(merged.tasks.map(t => t.id), ['a', 'b'])
 })
 
-test('the same task changed differently on both sides is a conflict, keeping the local version', () => {
-  const local = { spaces: [space], tasks: [task('a', { title: 'Mine' }), task('b'), task('c')] }
+test('different fields of the same task changed in each tab are both kept, with no conflict', () => {
+  const local = { spaces: [space], tasks: [task('a', { done: true }), task('b'), task('c')] }
+  const remote = { spaces: [space], tasks: [task('a', { notes: 'From my phone' }), task('b'), task('c')] }
+  const { merged, conflicts } = mergePlanner(base, local, remote)
+  assert.deepEqual(conflicts, [])
+  assert.equal(merged.tasks[0].done, true)
+  assert.equal(merged.tasks[0].notes, 'From my phone')
+})
+
+test('the same field changed differently is a conflict: the other version is kept, the rest is merged', () => {
+  const local = { spaces: [space], tasks: [task('a', { title: 'Mine', priority: 'High' }), task('b'), task('c')] }
   const remote = { spaces: [space], tasks: [task('a', { title: 'Theirs' }), task('b'), task('c')] }
   const { merged, conflicts } = mergePlanner(base, local, remote)
-  assert.deepEqual(conflicts, ['a'])
-  assert.equal(merged.tasks[0].title, 'Mine')
+  assert.deepEqual(conflicts.map(c => [c.collection, c.id, c.fields]), [['tasks', 'a', ['title']]])
+  assert.equal(merged.tasks[0].title, 'Theirs')
+  assert.equal(merged.tasks[0].priority, 'High')
+  assert.deepEqual(describeConflict(conflicts[0]), { name: 'Mine', detail: 'title' })
+})
+
+test('related fields merge as one group, so steps and their completion stay consistent', () => {
+  const base = { spaces: [space], tasks: [task('a', { steps: ['one', 'two'], completedSteps: [] })] }
+  const local = { spaces: [space], tasks: [task('a', { steps: ['one', 'two'], completedSteps: [1] })] }
+  const remote = { spaces: [space], tasks: [task('a', { steps: ['two'], completedSteps: [] })] }
+  const { merged, conflicts } = mergePlanner(base, local, remote)
+  assert.deepEqual(conflicts.map(c => c.fields), [['steps', 'completedSteps']])
+  assert.deepEqual([merged.tasks[0].steps, merged.tasks[0].completedSteps], [['two'], []])
+})
+
+test('a task edited here but deleted in the other tab stays deleted until the user restores their version', () => {
+  const local = { spaces: [space], tasks: [task('a', { title: 'Edited' }), task('b'), task('c')] }
+  const remote = { spaces: [space], tasks: [task('b'), task('c')] }
+  const { merged, conflicts } = mergePlanner(base, local, remote)
+  assert.deepEqual(merged.tasks.map(t => t.id), ['b', 'c'])
+  assert.deepEqual(describeConflict(conflicts[0]), { name: 'Edited', detail: 'deleted in the other tab' })
+  const { state, skipped } = applyLocalVersion(merged, conflicts)
+  assert.equal(skipped, 0)
+  assert.deepEqual(state.tasks.map(t => [t.id, t.title]), [['b', 'Task b'], ['c', 'Task c'], ['a', 'Edited']])
+})
+
+test('"Use my version" applies only the conflicting fields on top of the merged task', () => {
+  const local = { spaces: [space], tasks: [task('a', { title: 'Mine' }), task('b'), task('c')] }
+  const remote = { spaces: [space], tasks: [task('a', { title: 'Theirs', notes: 'Kept' }), task('b'), task('c')] }
+  const { merged, conflicts } = mergePlanner(base, local, remote)
+  const { state } = applyLocalVersion(merged, conflicts)
+  assert.deepEqual([state.tasks[0].title, state.tasks[0].notes], ['Mine', 'Kept'])
+})
+
+test('pins from both tabs never exceed the top 3; the server pins win', () => {
+  const pinned = id => task(id, { pinned: true })
+  const base = { spaces: [space], tasks: ['a', 'b', 'c', 'd'].map(id => task(id)) }
+  const local = { spaces: [space], tasks: [task('a'), task('b'), task('c'), pinned('d')] }
+  const remote = { spaces: [space], tasks: [pinned('a'), pinned('b'), pinned('c'), task('d')] }
+  const { merged, unpinned } = mergePlanner(base, local, remote)
+  assert.equal(unpinned, 1)
+  assert.deepEqual(merged.tasks.filter(t => t.pinned).map(t => t.id), ['a', 'b', 'c'])
+})
+
+test('"Use my version" will not delete a space that tasks still use', () => {
+  const base = { spaces: [space, work], tasks: [] }
+  const local = { spaces: [space], tasks: [] }
+  const remote = { spaces: [space, { ...work, name: 'Job' }], tasks: [task('j', { spaceId: 'work', space: 'Job' })] }
+  const { merged, conflicts } = mergePlanner(base, local, remote)
+  assert.deepEqual(conflicts.map(c => [c.collection, c.id]), [['spaces', 'work']])
+  const { state, skipped } = applyLocalVersion(merged, conflicts)
+  assert.equal(skipped, 1)
+  assert.deepEqual(state.spaces.map(s => s.id), ['school', 'work'])
 })
 
 test('identical changes on both sides and key order differences are not conflicts', () => {
@@ -44,9 +106,6 @@ test('identical changes on both sides and key order differences are not conflict
   const { conflicts } = mergePlanner(base, local, remote)
   assert.deepEqual(conflicts, [])
 })
-
-const work = { id: 'work', name: 'Work', color: '#123456' }
-const home = { id: 'home', name: 'Home', color: '#654321' }
 
 test('a task moved into a space the other side deleted follows that space tasks to their new space', () => {
   const base = { spaces: [space, work, home], tasks: [task('a'), task('w', { spaceId: 'work', space: 'Work' })] }

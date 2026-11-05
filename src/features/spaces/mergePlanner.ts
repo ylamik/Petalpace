@@ -1,9 +1,20 @@
 // Three-way merge used when a save is rejected with 409 because another tab or device saved first.
 // base = what this tab last saved, local = this tab's unsaved state, remote = the server's latest state.
-// Items are merged by id: whichever side changed an item wins. If both sides changed the same item
-// differently, the local version is kept and the item is reported as a conflict.
+//
+// Items are matched by id and merged field by field. Fields that only make sense together are merged as
+// one group (status and pin, space name and id, the deadline, steps and their completion). A group changed
+// on one side takes that side's value. A group changed differently on both sides is a conflict: the merge
+// keeps the remote value so everything else can be saved right away, and reports the local value so the
+// user can choose to apply it afterwards with applyLocalVersion.
 type Item = { id: string }
-export type PlannerState<S extends Item, T extends Item> = { spaces: S[]; tasks: T[] }
+type SpaceItem = Item & { name: string }
+type TaskItem = Item & { spaceId: string; space: string; pinned?: boolean; done?: boolean }
+export type PlannerState<S extends SpaceItem, T extends TaskItem> = { spaces: S[]; tasks: T[] }
+export type ItemConflict<T> = { collection: 'spaces' | 'tasks'; id: string; fields: string[]; local?: T; remote?: T }
+export type Relocation = { from: string; to: string; count: number }
+
+const TASK_GROUPS = [['done', 'started', 'blocked', 'pinned'], ['space', 'spaceId'], ['dueDate', 'dueTime', 'dueZone', 'dueToday'], ['steps', 'completedSteps']]
+export const PIN_LIMIT = 3
 
 function canonical(value: unknown): unknown {
   if (typeof File !== 'undefined' && value instanceof File) return { file: [value.name, value.size, value.lastModified, value.type] }
@@ -14,17 +25,46 @@ function canonical(value: unknown): unknown {
   return value
 }
 const same = (a: unknown, b: unknown) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b))
+const fieldsOf = (item: object | undefined, fields: string[]) => Object.fromEntries(fields.map(field => [field, (item as Record<string, unknown> | undefined)?.[field]]))
+const assign = <T,>(item: T, values: Record<string, unknown>): T => {
+  const next = { ...item } as Record<string, unknown>
+  for (const [key, value] of Object.entries(values)) {
+    if (value === undefined) delete next[key]
+    else next[key] = value
+  }
+  return next as T
+}
 
-export function mergeItems<T extends Item>(base: T[], local: T[], remote: T[]) {
+function groupsFor(items: (object | undefined)[], groups: string[][]) {
+  const keys = new Set(items.flatMap(item => (item ? Object.keys(item) : [])))
+  keys.delete('id')
+  const grouped = new Set(groups.flat())
+  return [...groups.filter(group => group.some(key => keys.has(key))), ...[...keys].filter(key => !grouped.has(key)).map(key => [key])]
+}
+
+export function mergeItems<T extends Item>(collection: 'spaces' | 'tasks', base: T[], local: T[], remote: T[], groups: string[][] = []) {
   const byId = (items: T[]) => new Map(items.map(item => [item.id, item]))
   const b = byId(base), l = byId(local), r = byId(remote)
-  const conflicts: string[] = []
+  const conflicts: ItemConflict<T>[] = []
   const pick = (id: string): T | undefined => {
     const baseItem = b.get(id), localItem = l.get(id), remoteItem = r.get(id)
     if (same(baseItem, localItem)) return remoteItem
     if (same(baseItem, remoteItem) || same(localItem, remoteItem)) return localItem
-    conflicts.push(id)
-    return localItem
+    if (!localItem || !remoteItem) {
+      // One side deleted the item and the other edited it. Keep the server's choice; the user can restore theirs.
+      conflicts.push({ collection, id, fields: [], local: localItem, remote: remoteItem })
+      return remoteItem
+    }
+    let merged = remoteItem
+    const clashing: string[] = []
+    for (const group of groupsFor([baseItem, localItem, remoteItem], groups)) {
+      const baseValue = fieldsOf(baseItem, group), localValue = fieldsOf(localItem, group), remoteValue = fieldsOf(remoteItem, group)
+      if (same(baseValue, localValue) || same(localValue, remoteValue)) continue
+      if (same(baseValue, remoteValue)) merged = assign(merged, localValue)
+      else clashing.push(...group)
+    }
+    if (clashing.length) conflicts.push({ collection, id, fields: clashing, local: localItem, remote: remoteItem })
+    return merged
   }
   const merged: T[] = []
   const seen = new Set<string>()
@@ -37,13 +77,24 @@ export function mergeItems<T extends Item>(base: T[], local: T[], remote: T[]) {
   return { merged, conflicts }
 }
 
-type SpaceItem = Item & { name: string }
-type TaskItem = Item & { spaceId: string; space: string }
-export type Relocation = { from: string; to: string; count: number }
+// The server allows at most three unfinished pinned tasks. Keep the server's pins and drop extra ones from this tab.
+function enforcePinLimit<T extends TaskItem>(tasks: T[], keepPinned: (task: T) => boolean) {
+  let count = tasks.filter(task => task.pinned && !task.done).length
+  let unpinned = 0
+  const result = [...tasks]
+  for (let i = result.length - 1; i >= 0 && count > PIN_LIMIT; i--) {
+    const task = result[i]
+    if (!task.pinned || task.done || keepPinned(task)) continue
+    result[i] = { ...task, pinned: false }
+    count--
+    unpinned++
+  }
+  return { tasks: result, unpinned }
+}
 
 export function mergePlanner<S extends SpaceItem, T extends TaskItem>(base: PlannerState<S, T>, local: PlannerState<S, T>, remote: PlannerState<S, T>) {
-  const spaceMerge = mergeItems(base.spaces, local.spaces, remote.spaces)
-  const taskMerge = mergeItems(base.tasks, local.tasks, remote.tasks)
+  const spaceMerge = mergeItems('spaces', base.spaces, local.spaces, remote.spaces)
+  const taskMerge = mergeItems('tasks', base.tasks, local.tasks, remote.tasks, TASK_GROUPS)
   let spaces = spaceMerge.merged
   const key = (name: string) => name.trim().toLowerCase()
 
@@ -92,9 +143,50 @@ export function mergePlanner<S extends SpaceItem, T extends TaskItem>(base: Plan
     tasks = tasks.map(task => names.has(task.spaceId) ? { ...task, space: names.get(task.spaceId)! } : task)
   }
 
+  const pins = enforcePinLimit(tasks, task => !!remoteTask.get(task.id)?.pinned)
+
   return {
-    merged: { spaces, tasks },
-    conflicts: [...spaceMerge.conflicts, ...taskMerge.conflicts],
+    merged: { spaces, tasks: pins.tasks },
+    conflicts: [...spaceMerge.conflicts, ...taskMerge.conflicts] as ItemConflict<S | T>[],
     relocations: [...relocations.values()],
+    unpinned: pins.unpinned,
   }
+}
+
+// "Use my version": apply this tab's values for the conflicting items on top of the current planner.
+// A space is only deleted if no task still uses it, and pins stay within the top 3 limit.
+export function applyLocalVersion<S extends SpaceItem, T extends TaskItem>(state: PlannerState<S, T>, conflicts: ItemConflict<S | T>[]) {
+  let { spaces, tasks } = state
+  let skipped = 0
+  const applyTo = <U extends Item>(items: U[], conflict: ItemConflict<U>) => {
+    const index = items.findIndex(item => item.id === conflict.id)
+    if (!conflict.local) return items.filter(item => item.id !== conflict.id)
+    if (index === -1) return [...items, conflict.local]
+    const next = [...items]
+    next[index] = conflict.fields.length ? assign(items[index], fieldsOf(conflict.local, conflict.fields)) : conflict.local
+    return next
+  }
+  for (const conflict of conflicts) {
+    if (conflict.collection === 'spaces') {
+      if (!conflict.local && tasks.some(task => task.spaceId === conflict.id)) { skipped++; continue }
+      spaces = applyTo(spaces, conflict as ItemConflict<S>)
+    } else {
+      const next = applyTo(tasks, conflict as ItemConflict<T>)
+      const task = next.find(item => item.id === conflict.id)
+      if (task && !spaces.some(space => space.id === task.spaceId)) { skipped++; continue }
+      tasks = next
+    }
+  }
+  const before = new Map(state.tasks.map(task => [task.id, task]))
+  const pins = enforcePinLimit(tasks, task => !!before.get(task.id)?.pinned)
+  return { state: { spaces, tasks: pins.tasks }, skipped: skipped + pins.unpinned }
+}
+
+const FIELD_LABELS: Record<string, string> = { title: 'title', done: 'status', pinned: 'top 3 pin', notes: 'notes', space: 'space', priority: 'priority', dueDate: 'deadline', steps: 'steps', files: 'attachments', links: 'links', name: 'name', color: 'color' }
+export function describeConflict(conflict: ItemConflict<{ id: string; title?: string; name?: string }>) {
+  const item = conflict.local ?? conflict.remote
+  const name = item?.title ?? item?.name ?? 'Untitled'
+  if (!conflict.fields.length) return { name, detail: conflict.local ? 'deleted in the other tab' : 'deleted in this tab' }
+  const labels = [...new Set(conflict.fields.map(field => FIELD_LABELS[field]).filter(Boolean))]
+  return { name, detail: labels.join(', ') || 'details' }
 }
