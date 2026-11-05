@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type SetState
 import { SpacesContext, type Space, type SpaceTask, type DeletedTask } from './spaces'
 import { useAuth } from '../auth/auth'
 import { usePlannerSync } from '../../hooks/usePlannerSync'
+import { mergePlanner } from './mergePlanner'
 type Snapshot={spaces:Space[];tasks:SpaceTask[]}
 type WireFile={name:string;type:string;lastModified:number;data:string}
 const fileReferences = new WeakMap<File, {taskId:string;index:number}>()
@@ -16,9 +17,11 @@ const decode=(task:WireTask)=>({...task,files:task.files.map((file,index)=>{
 })})
 const decodeTrash=(items:(WireTask & {deletedAt:number;expiresAt:number})[]=[])=>items.map(item=>({...decode(item),deletedAt:item.deletedAt,expiresAt:item.expiresAt}))
 const encode=(file:File)=>new Promise<WireFile>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('Could not read an attachment. Please remove it and try again.'));reader.onload=()=>resolve({name:file.name,type:file.type,lastModified:file.lastModified,data:String(reader.result).split(',')[1]});reader.readAsDataURL(file)})
+class ConflictError extends Error {}
 async function request(data?:unknown) {
   const response=await fetch('/api/auth/planner',{method:data?'PUT':'GET',credentials:'same-origin',cache:'no-store',headers:data?{'Content-Type':'application/json'}:undefined,body:data?JSON.stringify(data):undefined,signal:AbortSignal.timeout(30000)})
   const result=await response.json().catch(()=>null)
+  if(response.status===409) throw new ConflictError(result?.error || 'Your planner changed in another tab.')
   if(!response.ok || !result) throw new Error(result?.error || 'Could not reach your planner. Keep this page open and try again.')
   if(result.binVersion!==1 || !Array.isArray(result.trash))throw new Error('Your running server needs an update for safe deletion. Stop the existing terminal process with Ctrl+C, run npm run dev again, then reload this page.')
   return result
@@ -31,6 +34,7 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
   const trashRef=useRef<DeletedTask[]>([])
   const [activity,setActivity]=useState<{day:string;count:number}[]>([])
   const [error,setError]=useState('')
+  const [conflict,setConflict]=useState(false)
   const [reloadOpen,setReloadOpen]=useState(false)
   const [saving,setSaving]=useState(false)
   const [notice,setNotice]=useState<{message:string;id:number;taskLink?:boolean;binLink?:boolean;undoTasks?:DeletedTask[]}|null>(null)
@@ -82,6 +86,7 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
   const flush=useCallback(async()=>{
     if(running.current || failed.current || !alive.current)return
     running.current=true;setSaving(true)
+    let rebases=0, rebaseNote=''
     try {
       while(pending.current && alive.current){
         const snapshot=pending.current;pending.current=null
@@ -96,7 +101,8 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
           const removedTasks=removed.length
           const added=snapshot.tasks.filter(task=>!saved.current?.tasks.some(previous=>previous.id===task.id)).length
           const removedSpaces=(saved.current?.spaces ?? []).filter(space=>!snapshot.spaces.some(current=>current.id===space.id)).length
-          if(alive.current && purgeIds.length)setNotice({message:`${purgeIds.length} ${purgeIds.length===1?'task':'tasks'} permanently deleted.`,id:Date.now()})
+          if(alive.current && rebaseNote){setNotice({message:rebaseNote,id:Date.now()});rebaseNote=''}
+          else if(alive.current && purgeIds.length)setNotice({message:`${purgeIds.length} ${purgeIds.length===1?'task':'tasks'} permanently deleted.`,id:Date.now()})
           else if(alive.current && added) {
             const restored=snapshot.tasks.filter(task=>trashRef.current.some(deleted=>deleted.id===task.id)).length
             setNotice({message:restored===added?(added===1?'Task restored!':`${added} tasks restored!`):(added===1?'Task added!':`${added} tasks added!`),id:Date.now(),taskLink:true})
@@ -106,8 +112,33 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
           else if(alive.current && removedSpaces) setNotice({message:'Space deleted. Your tasks are safe in their selected space.',id:Date.now()})
           snapshot.tasks.forEach(task=>task.files.forEach((file,index)=>fileReferences.set(file,{taskId:task.id,index})))
           revision.current=result.revision;saved.current=snapshot
-          if(alive.current){trashRef.current=decodeTrash(result.trash);setTrash(trashRef.current);setActivity(result.activity);setError('')}
-        }catch(e){pending.current=pending.current??snapshot;failed.current=true;if(alive.current)setError(e instanceof Error?e.message:'Could not save. Keep this page open and retry.');break}
+          if(alive.current){trashRef.current=decodeTrash(result.trash);setTrash(trashRef.current);setActivity(result.activity);setError('');setConflict(false)}
+        }catch(e){
+          let failure=e
+          // Another tab or device saved first: fetch the latest planner, replay this tab's edits on top of it, and save again.
+          if(e instanceof ConflictError && rebases<3 && alive.current){
+            rebases++
+            try{
+              const result=await request()
+              if(!alive.current)break
+              const remote={spaces:result.spaces as Space[],tasks:(result.tasks as WireTask[]).map(decode)}
+              const {merged,conflicts,relocations}=mergePlanner(saved.current ?? {spaces:[],tasks:[]},pending.current ?? snapshot,remote)
+              if(relocations.length) rebaseNote=relocations.map(({from,to,count})=>`“${from}” was deleted in another tab or device, so ${count===1?'1 task was':`${count} tasks were`} moved to ${to}.`).join(' ')
+              revision.current=result.revision;saved.current=remote
+              trashRef.current=decodeTrash(result.trash);setTrash(trashRef.current);setActivity(result.activity)
+              pending.current=merged;setData(merged)
+              if(conflicts.length){
+                failed.current=true;setConflict(true)
+                setError(conflicts.length===1?'This task was also changed in another tab or device.':`${conflicts.length} items were also changed in another tab or device.`)
+                break
+              }
+              continue
+            }catch(next){failure=next}
+          }
+          pending.current=pending.current??snapshot;failed.current=true
+          if(alive.current){setConflict(false);setError(failure instanceof Error?failure.message:'Could not save. Keep this page open and retry.')}
+          break
+        }
       }
     }finally{running.current=false;if(alive.current)setSaving(false)}
   },[])
@@ -169,7 +200,7 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
     {children}
     {syncing && <div role="status" className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-lg border border-blue/30 bg-surface px-4 py-2 text-sm text-dark-blue shadow">Updating from your other device…</div>}
     <div className="fixed right-4 bottom-4 left-4 z-50 flex flex-col gap-3 sm:left-auto sm:w-96">
-      {error && <div role="alert" className="rounded-xl border border-red/30 bg-surface p-4 text-dark-blue shadow-lg"><p className="font-semibold">Your changes haven’t been saved</p><p className="mt-1 text-sm">{error}</p><div className="mt-3 flex gap-3"><button onClick={()=>{failed.current=false;void flush()}} className="rounded bg-blue px-3 py-2 text-white">Retry saving</button><button onClick={()=>setReloadOpen(true)} className="text-sm text-link underline">Reload saved version</button></div></div>}
+      {error && <div role="alert" className="rounded-xl border border-red/30 bg-surface p-4 text-dark-blue shadow-lg"><p className="font-semibold">Your changes haven’t been saved</p><p className="mt-1 text-sm">{error}</p>{conflict && <p className="mt-1 text-sm">Keep your changes to save this tab’s version over the other one, or reload to use the saved version.</p>}<div className="mt-3 flex gap-3"><button onClick={()=>{failed.current=false;setConflict(false);void flush()}} className="rounded bg-blue px-3 py-2 text-white">{conflict?'Keep my changes':'Retry saving'}</button><button onClick={()=>setReloadOpen(true)} className="text-sm text-link underline">Reload saved version</button></div></div>}
       {notice && <div role="status" className={`flex gap-3 rounded-xl border border-dark-blue/20 bg-surface p-4 text-dark-blue shadow-lg ${notice.undoTasks?.length || notice.binLink || notice.taskLink ? 'items-start' : 'items-center'}`}><img src="/images/task-added.png" alt="" aria-hidden="true" className="h-9 w-9 shrink-0 object-contain"/><div className="min-w-0 flex-1 text-base"><p>{notice.message}</p>{notice.undoTasks?.length ? <button type="button" onClick={undoDelete} disabled={saving} className="mt-2 min-h-11 rounded-lg border border-blue px-4 text-sm font-semibold text-link hover:bg-beige disabled:opacity-50">Undo deletion</button> : null}{notice.binLink && <Link to="/bin" onClick={()=>setNotice(null)} className="mt-2 ml-3 inline-block text-sm font-medium text-link underline">View Bin</Link>}{notice.taskLink && <Link to="/tasks" onClick={()=>setNotice(null)} className="mt-1 inline-block text-sm font-medium text-link underline underline-offset-2">View in All tasks</Link>}</div><button onClick={()=>setNotice(null)} aria-label="Dismiss notification" className="rounded px-2 text-xl text-link">×</button></div>}
     </div>
     {reloadOpen && <ConfirmTaskDialog title="Reload your saved planner?" message="Unsaved changes on this page will be discarded. Your saved tasks will stay safe." confirmLabel="Reload saved version" onCancel={()=>setReloadOpen(false)} onConfirm={()=>{pending.current=null;window.location.reload()}}/>}

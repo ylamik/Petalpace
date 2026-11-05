@@ -29,6 +29,29 @@ async function fixture(t,path=':memory:',cleanup=()=>{}){
   }
   return {request,reset,db,advance:days=>{clock+=days*86400000}}
 }
+test('a stale save gets 409, then saving the refetched planner with the new revision keeps both tabs edits',async t=>{
+  const f=await fixture(t);const start=(await f.request()).body
+  const tabB=await f.request({...start,tasks:[task({id:'b'})]});assert.equal(tabB.status,200)
+  assert.equal((await f.request({...start,tasks:[task({id:'a'})]})).status,409)
+  const latest=(await f.request()).body
+  const rebased=await f.request({...latest,tasks:[...latest.tasks,task({id:'a'})]});assert.equal(rebased.status,200)
+  assert.deepEqual((await f.request()).body.tasks.map(item=>item.id).sort(),['a','b'])
+})
+test('a rebased save after another tab deleted a space is accepted by the server',async t=>{
+  const {mergePlanner}=await import('../src/features/spaces/mergePlanner.ts')
+  const f=await fixture(t);const start=(await f.request()).body
+  const work={id:'work',name:'Work',color:'#123456'}
+  const base=await f.request({...start,spaces:[...start.spaces,work],tasks:[task({id:'w',space:'Work'}),task({id:'a',title:'Other task'})]});assert.equal(base.status,200)
+  const saved=(await f.request()).body
+  const tabB=await f.request({...saved,spaces:saved.spaces.filter(s=>s.id!=='work'),tasks:saved.tasks.map(item=>item.id==='w'?{...item,space:'Personal',spaceId:'personal'}:item)});assert.equal(tabB.status,200)
+  const local={spaces:saved.spaces,tasks:saved.tasks.map(item=>item.id==='a'?{...item,space:'Work',spaceId:'work'}:item)}
+  assert.equal((await f.request({...saved,...local})).status,409)
+  const latest=(await f.request()).body
+  const {merged,relocations}=mergePlanner(saved,local,latest)
+  assert.deepEqual(relocations,[{from:'Work',to:'Personal',count:1}])
+  const rebased=await f.request({...latest,...merged});assert.equal(rebased.status,200)
+  assert.deepEqual((await f.request()).body.tasks.map(item=>[item.id,item.space]).sort(),[['a','Personal'],['w','Personal']])
+})
 test('resetting activity clears history, returns the new revision, and rejects foreign origins',async t=>{
   const f=await fixture(t);let state=(await f.request()).body
   const saved=await f.request({...state,tasks:[task({done:true})]});assert.equal(saved.status,200)
