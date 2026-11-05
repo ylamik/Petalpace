@@ -7,6 +7,7 @@ export default function ProgressDialog({ onClose }: { onClose: () => void }) {
   const { resetActivity } = useSpaces()
   const [confirming, setConfirming] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState('')
 
   useEffect(() => {
     const dialog = ref.current
@@ -20,11 +21,14 @@ export default function ProgressDialog({ onClose }: { onClose: () => void }) {
 
   async function handleReset() {
     setResetting(true)
+    setResetError('')
     try {
       await resetActivity()
+      setConfirming(false)
+    } catch (e) {
+      setResetError(e instanceof Error ? e.message : 'Could not reset your activity history. Please try again.')
     } finally {
       setResetting(false)
-      setConfirming(false)
     }
   }
 
@@ -49,7 +53,8 @@ export default function ProgressDialog({ onClose }: { onClose: () => void }) {
       <ActivityHeatmap />
 
       {/* Reset history */}
-      <div className="mt-5 flex items-center justify-between gap-3 border-t border-dark-blue/10 pt-4">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-dark-blue/10 pt-4">
+        {resetError && <p role="alert" className="w-full text-sm text-red">{resetError}</p>}
         {!confirming ? (
           <button
             type="button"

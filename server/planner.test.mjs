@@ -23,8 +23,23 @@ async function fixture(t,path=':memory:',cleanup=()=>{}){
     const response=await fetch(`http://127.0.0.1:${server.address().port}/api/auth/planner`,{method:data?'PUT':'GET',headers:{...(user===null?{}:{cookie:`petalpace_session=${tokens[user]}`}),...(data?{'content-type':'application/json',origin}:{})},body:data?JSON.stringify(data):undefined,signal:AbortSignal.timeout(5000)})
     return {status:response.status,body:await response.json()}
   }
-  return {request,db,advance:days=>{clock+=days*86400000}}
+  const reset=async(user=0,origin='http://localhost:5173')=>{
+    const response=await fetch(`http://127.0.0.1:${server.address().port}/api/auth/planner`,{method:'DELETE',headers:{cookie:`petalpace_session=${tokens[user]}`,origin},signal:AbortSignal.timeout(5000)})
+    return {status:response.status,body:await response.json()}
+  }
+  return {request,reset,db,advance:days=>{clock+=days*86400000}}
 }
+test('resetting activity clears history, returns the new revision, and rejects foreign origins',async t=>{
+  const f=await fixture(t);let state=(await f.request()).body
+  const saved=await f.request({...state,tasks:[task({done:true})]});assert.equal(saved.status,200)
+  assert.equal(saved.body.activity.length,1)
+  assert.equal((await f.reset(0,'https://evil.example')).status,403)
+  assert.equal((await f.request()).body.activity.length,1)
+  const cleared=await f.reset();assert.equal(cleared.status,200)
+  assert.deepEqual(cleared.body.activity,[]);assert.equal(cleared.body.revision,saved.body.revision+1)
+  state=(await f.request()).body;assert.deepEqual(state.activity,[]);assert.equal(state.revision,cleared.body.revision)
+  assert.equal((await f.request({...state,tasks:[task()]})).status,200)
+})
 test('new accounts start empty; spaces/tasks/files persist and remain isolated',async t=>{
   const directory=mkdtempSync(join(tmpdir(),'petalpace-planner-test-')),path=join(directory,'test.sqlite')
   const f=await fixture(t,path,()=>rmSync(directory,{recursive:true,force:true})),first=await f.request()

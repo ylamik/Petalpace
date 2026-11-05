@@ -79,8 +79,9 @@ export function createPlannerHandler({db,findSession,origins,limit,now=Date.now}
         if(!origins.includes(req.headers.origin)) return reply(403,{error:'Please use the Petalpace website.'})
         db.prepare('DELETE FROM completions WHERE user_id=?').run(user.id)
         db.prepare('UPDATE planners SET revision=revision+1 WHERE user_id=?').run(user.id)
+        const revision=db.prepare('SELECT revision FROM planners WHERE user_id=?').get(user.id)?.revision ?? 0
         notifyPlannerChanged(user.id)
-        return reply(200,{activity:[],message:'Activity history cleared.'})
+        return reply(200,{activity:[],revision,message:'Activity history cleared.'})
       }
       if(req.method!=='PUT') return reply(405,{error:'Use GET or PUT.'})
       if(!origins.includes(req.headers.origin)) return reply(403,{error:'Please use the Petalpace website.'})

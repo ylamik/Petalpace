@@ -142,9 +142,16 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
     setData(current=>current?{...current}:current)
   },[])
   const resetActivity=useCallback(async()=>{
-    await fetch('/api/auth/planner',{method:'DELETE',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(15000)})
-    setActivity([])
-  },[])
+    // Let any in-flight save finish first so its revision can't overwrite the one the reset returns.
+    await ensureSaved()
+    let response:Response
+    try{response=await fetch('/api/auth/planner',{method:'DELETE',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(15000)})}
+    catch{throw new Error('Could not reach your planner. Your activity history was not reset.')}
+    const result=await response.json().catch(()=>null)
+    if(!response.ok || !result) throw new Error(result?.error || 'Could not reset your activity history. Please try again.')
+    if(typeof result.revision==='number' && result.revision>revision.current) revision.current=result.revision
+    if(alive.current) setActivity([])
+  },[ensureSaved])
   function undoDelete(){
     if(!data || !notice?.undoTasks?.length)return
     const restoring=notice.undoTasks.filter(task=>!data.tasks.some(current=>current.id===task.id))
