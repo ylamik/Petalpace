@@ -59,7 +59,7 @@ export default function ProgressDialog({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            className="text-sm text-gray hover:text-red hover:underline"
+            className="min-h-10 rounded-lg border border-red px-4 py-1.5 text-sm font-semibold text-red hover:bg-red/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red"
           >
             Reset activity history
           </button>
