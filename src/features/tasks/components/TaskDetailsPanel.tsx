@@ -10,7 +10,7 @@ import { ButtonSpinner } from '../../../components/ui/PageLoader'
 import { TITLE_LIMIT, validDueTime } from './taskPresentation'
 import { useSpaces } from '../../spaces/spaces'
 import ConfirmTaskDialog from './ConfirmTaskDialog'
-import { getStatus, statusChange } from './taskPresentation'
+import { getStatus, statusChange, UNPINNED_ON_DONE } from './taskPresentation'
 import { useEffect, useRef, useState } from 'react'
 import type { TaskDraft } from './AddTaskDialog'
 
@@ -41,7 +41,8 @@ function FileDownload({ file }: { file: File }) {
 }
 
 export default function TaskDetailsPanel({ task: originalTask, onChange: commitChanges, onClose, onDelete, spaceOptions: providedSpaces }: Props) {
-  const {spaces,tasks,saving}=useSpaces()
+  const {spaces,tasks,saving,notify}=useSpaces()
+  const commit=(changes:DetailTask)=>{if(originalTask.pinned && !originalTask.done && changes.done)notify(UNPINNED_ON_DONE);commitChanges(changes)}
   const spaceOptions=providedSpaces ?? spaces.map(s=>s.name)
   const [editingTitle,setEditingTitle]=useState(false)
   const [task, setTask] = useState(originalTask)
@@ -59,7 +60,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
     if(tasks.some(t=>t.id!==(originalTask as {id?:string}).id && taskIdentity({...t,dueZone:t.dueZone || zone})===taskIdentity({...task,dueZone:zone}))){setError('This task already exists. Change the title, space, priority, or deadline.');return}
 
     if (task.space !== originalTask.space) { setConfirmMove(true); return }
-    commitChanges({...task,title:task.title.trim()})
+    commit({...task,title:task.title.trim()})
     onClose()
   }
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -113,7 +114,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
       <div className="flex min-h-full flex-col px-6 pt-4 sm:px-7">
         <header>
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] text-gray">TASK DETAILS {task.pinned && <span className="ml-1 text-dark-blue"><span className="text-star">★</span> In my top 3</span>}</p>
+            <p className="text-[11px] text-gray">TASK DETAILS {task.pinned && !task.done && <span className="ml-1 text-dark-blue"><span className="text-star">★</span> In my top 3</span>}</p>
             <button type="button" autoFocus onClick={requestClose} aria-label="Close task details" className="rounded px-3 py-2 text-xl hover:bg-beige">×</button>
           </div>
           <div className="mt-1 flex min-w-0 items-center gap-2">
@@ -194,7 +195,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
           </div>
         </footer>
       </div>
-      {confirmMove && <ConfirmTaskDialog title={`Move task to ${task.space}?`} message={`This task will leave ${originalTask.space} and appear in ${task.space}. Its notes, steps, files, deadline, and status are kept. Your other edits will also be saved.`} confirmLabel="Move and save" cancelLabel="Keep editing" destructive={false} onCancel={()=>setConfirmMove(false)} onConfirm={()=>{commitChanges({...task,title:task.title.trim()});setConfirmMove(false);onClose()}}/>}
+      {confirmMove && <ConfirmTaskDialog title={`Move task to ${task.space}?`} message={`This task will leave ${originalTask.space} and appear in ${task.space}. Its notes, steps, files, deadline, and status are kept. Your other edits will also be saved.`} confirmLabel="Move and save" cancelLabel="Keep editing" destructive={false} onCancel={()=>setConfirmMove(false)} onConfirm={()=>{commit({...task,title:task.title.trim()});setConfirmMove(false);onClose()}}/>}
       {discardOpen && <ConfirmTaskDialog title="Discard unsaved changes?" message="Your changes have not been saved. Leave this task and discard them?" confirmLabel="Discard changes" onCancel={() => setDiscardOpen(false)} onConfirm={onClose} />}
       {confirmDelete && <ConfirmTaskDialog title="Delete this task?" message={`This task and its attachments will move to Recently deleted. You can restore them within 30 days.`} confirmLabel="Move to Recently deleted" cancelLabel="Keep task" onCancel={() => setConfirmDelete(false)} onConfirm={onDelete} />}
     </dialog>

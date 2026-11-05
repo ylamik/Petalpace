@@ -7,12 +7,14 @@ import TaskStatusSelect from './TaskStatusSelect'
 import TaskSpaceBadge from './TaskSpaceBadge'
 import TaskSpaceSelect from './TaskSpaceSelect'
 import { useState } from 'react'
-import { compareTasks, effectiveDue, groupTasksByDeadline, isDeadlineOverdue, getStatus, matchesDeadline, statusChange } from './taskPresentation'
+import { useSpaces } from '../../spaces/spaces'
+import { compareTasks, effectiveDue, groupTasksByDeadline, isDeadlineOverdue, getStatus, matchesDeadline, statusChange, DONE_PIN_HINT, UNPINNED_ON_DONE } from './taskPresentation'
 import type { TaskState } from './taskPresentation'
 export type RowTask = TaskState & { id: string | number; title: string; space: string; priority: 'High' | 'Medium' | 'Low'; pinned: boolean; dueDate?: string; dueTime?:string; dueToday?: boolean; steps?: string[]; completedSteps?: number[] }
 const field = 'min-h-11 min-w-0 rounded-md border border-dark-blue/20 bg-surface px-3 focus-visible:outline-blue'
 export function TaskRow<T extends RowTask>({ task, onOpen, onPin, onStatus, hideDue=false, selected, onSelect }: { selected?:boolean;onSelect?:()=>void; hideDue?:boolean; task: T; onOpen: (task:T) => void; onPin: (task:T) => void; onStatus: (task:T, state:TaskState) => void }) {
   const [stepsOpen, setStepsOpen] = useState(false)
+  const { notify } = useSpaces()
   const now=usePlannerClock()
   const missed=!task.done && isDeadlineOverdue(task,now)
   const showDeadline=!hideDue || !!task.dueTime || !effectiveDue(task)
@@ -33,8 +35,10 @@ export function TaskRow<T extends RowTask>({ task, onOpen, onPin, onStatus, hide
         </div>}
       </div>
       <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
-        <TaskStatusSelect value={status} title={task.title} onChange={next=>onStatus(task,statusChange(next))}/>
-        <button type="button" onClick={() => onPin(task)} aria-label={`${task.pinned ? 'Unpin' : 'Pin'} ${task.title}`} aria-pressed={task.pinned} className={`h-10 w-10 rounded text-2xl hover:bg-lightest-blue/30 ${task.pinned ? 'text-star' : 'text-gray'}`}>{task.pinned ? '★' : '☆'}</button>
+        <TaskStatusSelect value={status} title={task.title} onChange={next=>{if(task.pinned && !task.done && next==='done')notify(UNPINNED_ON_DONE);onStatus(task,statusChange(next))}}/>
+        {task.done
+          ? <button type="button" onClick={() => notify(`${DONE_PIN_HINT}. Set the task back to To do to pin it.`)} aria-disabled="true" aria-label={`Pin ${task.title}. ${DONE_PIN_HINT}.`} title={DONE_PIN_HINT} className="h-10 w-10 cursor-not-allowed rounded text-2xl text-gray opacity-40">☆</button>
+          : <button type="button" onClick={() => onPin(task)} aria-label={`${task.pinned ? 'Unpin' : 'Pin'} ${task.title}`} aria-pressed={task.pinned} className={`h-10 w-10 rounded text-2xl hover:bg-lightest-blue/30 ${task.pinned ? 'text-star' : 'text-gray'}`}>{task.pinned ? '★' : '☆'}</button>}
       </div>
     </div>
     {stepsOpen && <ol className="mt-3 space-y-2 border-t border-dark-blue/10 pt-3 text-sm">{task.steps?.map((step,i) => <li key={i} className="flex gap-2"><span aria-label={(task.completedSteps ?? []).includes(i) ? 'Done' : 'To do'}>{(task.completedSteps ?? []).includes(i) ? '✓' : '○'}</span>{step}</li>)}</ol>}

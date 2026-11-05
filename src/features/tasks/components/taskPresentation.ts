@@ -4,6 +4,8 @@ export type TaskState = { done: boolean; started?: boolean; blocked?: boolean }
 export function getStatus(task: TaskState): TaskStatus {
   return task.done ? 'done' : task.blocked ? 'blocked' : task.started ? 'progress' : 'todo'
 }
+export const DONE_PIN_HINT = "Completed tasks can't be in your top 3"
+export const UNPINNED_ON_DONE = 'Task done! Removed from your top 3.'
 export function statusChange(status: string): TaskState {
   return { done: status === 'done', started: status === 'progress', blocked: status === 'blocked' }
 }
