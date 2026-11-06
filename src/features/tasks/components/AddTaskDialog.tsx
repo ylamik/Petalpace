@@ -127,10 +127,14 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!title.trim() || Array.from(title.trim()).length > TITLE_LIMIT || !space || !priority) {
-      setError('Enter a title, space, and priority.')
+    // Name only what's missing, e.g. "Choose a space." or "Add a title and choose a priority."
+    const missing = [!title.trim() && 'add a title', !space && 'choose a space', !priority && 'choose a priority'].filter(Boolean) as string[]
+    if (!title.trim() || !space || !priority) {
+      const list = missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}`
+      setError(`Please ${list}.`)
       return
     }
+    if (Array.from(title.trim()).length > TITLE_LIMIT) { setError(`Keep the title to ${TITLE_LIMIT} characters or fewer.`); return }
     if (!validDueTime(dueTime) || (dueTime && !dueDate)) { setError('Choose a date for your deadline time.'); return }
     if (linkInput.trim()) {
       setError('Click Add link to attach your link, or clear the link field.')
