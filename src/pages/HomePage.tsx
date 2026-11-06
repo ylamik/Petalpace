@@ -862,7 +862,7 @@ export default function HomePage() {
 
               <address className="mt-3 space-y-3 text-sm not-italic">
                 <a
-                  href="mailto:carasmikyla02@gmail.com"
+                  href="mailto:petalpace7@gmail.com"
                   className="flex items-start gap-2 hover:underline"
                 >
                   <svg
@@ -880,7 +880,7 @@ export default function HomePage() {
                   </svg>
 
                   <span className="min-w-0 break-all">
-                    carasmikyla02@gmail.com
+                    petalpace7@gmail.com
                   </span>
                 </a>
 
@@ -938,6 +938,7 @@ export default function HomePage() {
           <div className="mt-6 max-w-64"></div>
           <p className="mt-6 text-sm">
             © {new Date().getFullYear()} · Created by Mikyla Caras
+            <span className="block sm:inline"><span className="hidden sm:inline"> · </span>Assisted by Erica Espiña</span>
           </p>
         </div>
       </footer>
