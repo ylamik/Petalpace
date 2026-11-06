@@ -135,7 +135,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
           <div className="mb-5"><p className="text-xs text-gray">Deadline timezone: {task.dueZone || Intl.DateTimeFormat().resolvedOptions().timeZone}</p><TimePicker value={task.dueTime ?? ''} onChange={dueTime=>onChange({dueTime})} disabled={!task.dueDate}/></div>
         </header>
         <section className="border-t border-dark-blue/15 py-4">
-          <div className="flex items-center justify-between"><h3 className="font-bold">Notes</h3><button type="button" onClick={() => setEditingNotes(!editingNotes)} className="rounded px-2 py-1 text-xs text-link">{editingNotes ? 'Done' : '✎ Edit'}</button></div>
+          <div className="flex items-center justify-between"><h3 className="font-bold">Notes</h3><button type="button" onClick={() => setEditingNotes(!editingNotes)} className="rounded px-2 py-1 text-xs text-link hover:underline">{editingNotes ? 'Done' : '✎ Edit'}</button></div>
           {editingNotes ? <textarea aria-label="Task notes" autoFocus value={task.notes ?? ''} onChange={(event) => onChange({ notes: event.target.value })} className={`${field} min-h-28 py-2 text-sm`} /> : <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-snug">{task.notes || 'No notes yet.'}</p>}
         </section>
         <section className="border-t border-dark-blue/15 py-4">
@@ -145,7 +145,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
             const replaceSteps = (next: string[]) => onChange({ steps: next, completedSteps: remapCompleted(steps, next, completed) })
             if (editingStep?.index === index) return <li key={`${index}-${text}`} className="py-2"><form onSubmit={(event) => { event.preventDefault(); const value = editingStep.text.trim(); if (value) replaceSteps(steps.map((item, i) => i === index ? value : item)); setEditingStep(null) }} className="flex gap-2">
               <input autoFocus aria-label={`Edit step ${index + 1}`} value={editingStep.text} maxLength={500} onChange={(event) => setEditingStep({ index, text: event.target.value })} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setEditingStep(null) } }} className={`${field} mt-0 flex-1`} />
-              <button className="min-h-11 shrink-0 rounded-lg bg-blue px-3 text-xs font-semibold text-white">Save</button>
+              <button className="min-h-11 shrink-0 rounded-lg bg-blue px-3 text-xs font-semibold text-white hover:bg-action-hover">Save</button>
               <button type="button" onClick={() => setEditingStep(null)} className="min-h-11 shrink-0 rounded-lg px-2 text-xs text-link hover:bg-beige">Cancel</button>
             </form></li>
             return <li key={`${index}-${text}`} className="group flex items-start gap-1 py-1.5">
@@ -154,14 +154,14 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
               <button type="button" onClick={() => replaceSteps(steps.filter((_, i) => i !== index))} aria-label={`Remove step: ${text}`} title="Remove step" className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-gray hover:bg-light-red/50 hover:text-red focus-visible:outline-blue"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="h-3.5 w-3.5"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
             </li>
           })}</ul>
-          <form onSubmit={(event) => { event.preventDefault(); if (step.trim()) { onChange({ steps: [...steps, step.trim()] }); setStep('') } }} className="mt-2 flex gap-2"><input aria-label="New step" placeholder="Add a step…" value={step} onChange={(event) => setStep(event.target.value)} className={`${field} mt-0 flex-1`} /><button disabled={!step.trim()} className="shrink-0 rounded border border-dark-blue/15 px-2 text-xs text-link disabled:opacity-40">+ Add step</button></form>
+          <form onSubmit={(event) => { event.preventDefault(); if (step.trim()) { onChange({ steps: [...steps, step.trim()] }); setStep('') } }} className="mt-2 flex gap-2"><input aria-label="New step" placeholder="Add a step…" value={step} onChange={(event) => setStep(event.target.value)} className={`${field} mt-0 flex-1`} /><button disabled={!step.trim()} className="shrink-0 rounded border border-dark-blue/15 px-2 text-xs text-link disabled:opacity-40 hover:bg-lightest-blue/50">+ Add step</button></form>
         </section>
         <section className="py-4">
-          <div className="mb-3 flex items-center justify-between"><h3 className="font-bold">Files &amp; links</h3><button type="button" aria-expanded={adding} onClick={() => setAdding(!adding)} className="rounded border border-dark-blue/15 px-2 py-1 text-xs text-link">{adding ? 'Close' : '+ Add'}</button></div>
+          <div className="mb-3 flex items-center justify-between"><h3 className="font-bold">Files &amp; links</h3><button type="button" aria-expanded={adding} onClick={() => setAdding(!adding)} className="rounded border border-dark-blue/15 px-2 py-1 text-xs text-link hover:bg-lightest-blue/50">{adding ? 'Close' : '+ Add'}</button></div>
           {adding && <div className="mb-3 rounded bg-beige/40 p-3">
             <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx" className="hidden" onChange={(event) => { const files = Array.from(event.target.files ?? []); const valid = files.filter((file) => /\.(pdf|docx?|pptx?)$/i.test(file.name) && file.size <= 10 * 1024 * 1024); setError(valid.length !== files.length ? 'Use PDF, Word or PowerPoint files up to 10 MB each.' : ''); const existing = task.files ?? []; onChange({ files: [...existing, ...valid.filter((file) => !existing.some((item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified))] }); event.target.value = '' }} />
-            <button type="button" onClick={() => fileRef.current?.click()} className="rounded border border-blue/20 bg-surface px-3 py-2 text-sm text-link">Upload files</button>
-            <form onSubmit={(event) => { event.preventDefault(); addLink() }} className="mt-2 flex gap-2"><input type="url" required aria-label="Link URL" placeholder="https://…" value={link} onChange={(event) => setLink(event.target.value)} className={`${field} mt-0 flex-1`} /><button className="rounded bg-blue px-2 text-xs text-white">Add link</button></form>
+            <button type="button" onClick={() => fileRef.current?.click()} className="rounded border border-blue/20 bg-surface px-3 py-2 text-sm text-link hover:bg-lightest-blue/50">Upload files</button>
+            <form onSubmit={(event) => { event.preventDefault(); addLink() }} className="mt-2 flex gap-2"><input type="url" required aria-label="Link URL" placeholder="https://…" value={link} onChange={(event) => setLink(event.target.value)} className={`${field} mt-0 flex-1`} /><button className="rounded bg-blue px-2 text-xs text-white hover:bg-action-hover">Add link</button></form>
           </div>}
           {error && <p role="alert" className="mb-2 text-xs text-red">{error}</p>}
           <p className="mb-3 text-xs text-gray">File and link changes apply when you click Save changes.</p>
@@ -202,9 +202,9 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
           <p className="mb-2 text-xs text-gray">{saving ? 'Saving your changes…' : dirty ? 'Unsaved changes' : 'Changes are saved only when you choose Save changes.'}</p>
           
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <button type="button" onClick={() => setConfirmDelete(true)} className="min-h-11 rounded px-2 text-sm text-red">Delete task</button>
-            <button type="button" onClick={requestClose} className="min-h-11 rounded border border-blue px-3 text-sm text-link">Cancel</button>
-            <button type="button" onClick={saveChanges} disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded bg-blue px-4 text-sm text-white disabled:opacity-70">
+            <button type="button" onClick={() => setConfirmDelete(true)} className="min-h-11 rounded px-2 text-sm text-red hover:bg-light-red/30">Delete task</button>
+            <button type="button" onClick={requestClose} className="min-h-11 rounded border border-blue px-3 text-sm text-link hover:bg-lightest-blue/50">Cancel</button>
+            <button type="button" onClick={saveChanges} disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded bg-blue px-4 text-sm text-white disabled:opacity-70 hover:bg-action-hover">
               {saving && <ButtonSpinner />}
               {saving ? 'Saving…' : 'Save changes'}
             </button>

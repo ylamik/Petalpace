@@ -47,7 +47,7 @@ export default function ActivityHeatmap({compact=false}:{compact?:boolean}) {
         {days.filter(d=>d.count>0).length===0 && <li>No completed tasks recorded in this period.</li>}
       </ul>}
       {selected!==null && <div role={pinned!==null?'dialog':'tooltip'} aria-label="Activity for selected day" className="absolute z-30 w-max max-w-full rounded-md border border-dark-blue/30 bg-surface px-3 py-2 text-dark-blue shadow-md" style={{left:`clamp(0px, ${Math.floor(selected/7)/weeks*100}%, max(0px, calc(100% - 250px)))`,bottom:`${(7-(selected%7))/7*100}%`,marginBottom:7,pointerEvents:pinned===null?'none':'auto'}}>
-        <div className="flex items-center gap-2"><p className="text-xs sm:text-sm">{days[selected].date.toLocaleDateString('en',{month:'long',day:'numeric',year:'numeric'})} &middot; {days[selected].count} {days[selected].count===1?'task':'tasks'} completed</p>{pinned!==null && <button type="button" aria-label="Close day details" onClick={()=>{setPinned(null);setHover(null)}} className="px-1 text-lg leading-none text-link">&times;</button>}</div>
+        <div className="flex items-center gap-2"><p className="text-xs sm:text-sm">{days[selected].date.toLocaleDateString('en',{month:'long',day:'numeric',year:'numeric'})} &middot; {days[selected].count} {days[selected].count===1?'task':'tasks'} completed</p>{pinned!==null && <button type="button" aria-label="Close day details" onClick={()=>{setPinned(null);setHover(null)}} className="px-1 text-lg leading-none text-link hover:underline">&times;</button>}</div>
       </div>}
     </div>
     </div>

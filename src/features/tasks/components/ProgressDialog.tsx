@@ -70,14 +70,14 @@ export default function ProgressDialog({ onClose }: { onClose: () => void }) {
               type="button"
               onClick={handleReset}
               disabled={resetting}
-              className="min-h-10 rounded-lg bg-danger px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+              className="min-h-10 rounded-lg bg-danger px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-60 hover:brightness-90"
             >
               {resetting ? 'Resetting…' : 'Yes, reset'}
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="min-h-10 rounded-lg border border-blue px-4 py-1.5 text-sm text-link"
+              className="min-h-10 rounded-lg border border-blue px-4 py-1.5 text-sm text-link hover:bg-lightest-blue/50"
             >
               Cancel
             </button>

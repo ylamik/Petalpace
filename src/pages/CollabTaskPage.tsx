@@ -66,6 +66,7 @@ export default function CollabTaskPage() {
   const [pendingStep,setPendingStep]=useState<{step:CollabSubtask;status:StepStatus} | null>(null)
   const [detailsOpen,setDetailsOpen]=useState(false)
   const [newSubtask, setNewSubtask] = useState('')
+  const [addingStep, setAddingStep] = useState(false)
 
   const isOwner = task?.ownerId === user?.id
   const canEdit=isOwner || task?.members.find(m=>m.id===user?.id)?.role==='editor'
@@ -101,7 +102,8 @@ export default function CollabTaskPage() {
   async function addSubtask() {
     if (!task || !newSubtask.trim()) return
     const subtasks = [...task.subtasks, { id: '', title: newSubtask.trim(), done: false, assignedTo: null, position: task.subtasks.length }]
-    if(await save({ subtasks }))setNewSubtask('')
+    setAddingStep(true)
+    try { if(await save({ subtasks }))setNewSubtask('') } finally { setAddingStep(false) }
   }
 
   async function setStepStatus(s: CollabSubtask, status: StepStatus) {
@@ -184,7 +186,7 @@ export default function CollabTaskPage() {
   if (error) return (
     <div className="p-8 text-dark-blue">
       <p role="alert">{error}</p>
-      <button type="button" onClick={() => navigate('/collaboration')} className="mt-4 rounded-lg bg-blue px-4 py-2 text-white">Back to Collaboration</button>
+      <button type="button" onClick={() => navigate('/collaboration')} className="mt-4 rounded-lg bg-blue px-4 py-2 text-white hover:bg-action-hover">Back to Collaboration</button>
     </div>
   )
   if (!task) return null
@@ -221,7 +223,7 @@ export default function CollabTaskPage() {
             <h1 className="break-words text-2xl font-bold sm:text-3xl">{task.title}</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={()=>{navigator.clipboard.writeText(window.location.href).then(()=>setSaveError('Task link copied. Only invited members can open it.')).catch(()=>setSaveError('Copy the page address to share with existing members.'))}} className="min-h-10 rounded-lg border border-blue/30 px-3 text-sm text-link">Copy task link</button>
+            <button type="button" onClick={()=>{navigator.clipboard.writeText(window.location.href).then(()=>setSaveError('Task link copied. Only invited members can open it.')).catch(()=>setSaveError('Copy the page address to share with existing members.'))}} className="min-h-10 rounded-lg border border-blue/30 px-3 text-sm text-link hover:bg-lightest-blue/50">Copy task link</button>
             {/* Status selector — all members can change */}
             {canEdit && !saving ? (
               <PlannerSelect
@@ -244,7 +246,7 @@ export default function CollabTaskPage() {
         </div>
         {syncing && <p role="status" className="mt-3 text-sm text-link">Updating shared task…</p>}
         {saving && <p className="mt-3 text-xs text-gray flex items-center gap-2"><ButtonSpinner />Saving…</p>}
-        {saveError && <div role="alert" className="mt-3 text-sm text-red">{saveError}<button onClick={()=>window.location.reload()} className="ml-2 text-link underline">Reload shared task</button></div>}
+        {saveError && <div role="alert" className="mt-3 text-sm text-red">{saveError}<button onClick={()=>window.location.reload()} className="ml-2 text-link underline hover:decoration-2">Reload shared task</button></div>}
       </header>
 
       {canEdit && <section className="mt-4 rounded-xl border border-dark-blue/15 bg-surface">
@@ -307,7 +309,7 @@ export default function CollabTaskPage() {
                   )}
                   </div>
                   <details className="mt-3 w-full min-w-0 border-t border-dark-blue/10 pt-3">
-                    <summary className="cursor-pointer text-sm font-medium text-link">Notes &amp; resources ({task.files.filter(f=>f.subtaskId===s.id).length+(s.links?.length || 0)})</summary>
+                    <summary className="cursor-pointer text-sm font-medium text-link hover:underline">Notes &amp; resources ({task.files.filter(f=>f.subtaskId===s.id).length+(s.links?.length || 0)})</summary>
                     <div className="mt-3 space-y-4">
                       {canEdit && <NoteEditor singleLine value={s.title} revision={task.revision} onSave={(title,revision)=>save({revision,subtasks:task.subtasks.map(item=>item.id===s.id?{...item,title}:item)})}/>}
                       {canEdit || ownsStep(s) ? <NoteEditor value={s.notes || ''} revision={task.revision} onSave={(notes,revision)=>save({revision,subtasks:task.subtasks.map(item=>item.id===s.id?{...item,notes}:item)})}/> : <p className="whitespace-pre-wrap break-words text-sm">{s.notes || 'No notes yet.'}</p>}
@@ -325,7 +327,7 @@ export default function CollabTaskPage() {
                 maxLength={500}
                 className="min-h-10 min-w-0 flex-1 rounded-lg border border-dark-blue/20 bg-surface px-3 text-sm focus-visible:outline-blue"
               />
-              <button type="submit" disabled={!newSubtask.trim()} className="min-h-10 rounded-lg border border-dark-blue/15 px-3 text-sm text-link disabled:opacity-40">+ Add</button>
+              <button type="submit" disabled={addingStep || saving || !newSubtask.trim()} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-dark-blue/15 px-3 text-sm text-link disabled:opacity-40 hover:bg-lightest-blue/50">{addingStep && <ButtonSpinner />}{addingStep ? 'Adding…' : '+ Add'}</button>
             </form>}
           </section>
 
@@ -450,6 +452,7 @@ export default function CollabTaskPage() {
 function NoteEditor({ value,revision, onSave,singleLine=false }: { singleLine?:boolean;value: string;revision:number; onSave: (v: string,revision:number) => Promise<CollabTask | undefined> }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
+  const [busy, setBusy] = useState(false)
   // Reset draft when editing begins so it reflects the latest saved value
   const baseline=useRef(revision)
   function startEditing() { baseline.current=revision;setDraft(value); setEditing(true) }
@@ -473,8 +476,8 @@ function NoteEditor({ value,revision, onSave,singleLine=false }: { singleLine?:b
         className="block min-h-28 w-full rounded-lg border border-dark-blue/20 bg-surface px-3 py-2 text-sm focus-visible:outline-blue resize-y"
       />}
       <div className="mt-2 flex gap-2">
-        <button type="button" disabled={singleLine && !draft.trim()} onClick={() => { void onSave(draft,baseline.current).then(updated=>{if(updated)setEditing(false)}) }} className="min-h-9 rounded-lg bg-blue px-3 text-sm text-white hover:bg-action-hover">Save</button>
-        <button type="button" onClick={() => { setDraft(value); setEditing(false) }} className="min-h-9 rounded-lg border border-blue px-3 text-sm text-link">Cancel</button>
+        <button type="button" disabled={busy || (singleLine && !draft.trim())} onClick={() => { setBusy(true); void onSave(draft,baseline.current).then(updated=>{if(updated)setEditing(false)}).finally(()=>setBusy(false)) }} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-blue px-3 text-sm text-white hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-70">{busy && <ButtonSpinner />}{busy ? 'Saving…' : 'Save'}</button>
+        <button type="button" disabled={busy} onClick={() => { setDraft(value); setEditing(false) }} className="min-h-9 rounded-lg border border-blue px-3 text-sm text-link hover:bg-lightest-blue/50 disabled:opacity-50">Cancel</button>
       </div>
     </div>
   )
@@ -509,7 +512,15 @@ function SharedDetails({task,save,canChangeZone}:{task:CollabTask;canChangeZone:
  const [title,setTitle]=useState(task.title),[date,setDate]=useState(task.dueDate),[time,setTime]=useState(task.dueTime),[priority,setPriority]=useState(task.priority)
  const clean=title===task.title && date===task.dueDate && time===task.dueTime && priority===task.priority && zone===task.dueZone
  useEffect(()=>{if(clean)baseline.current=task.revision},[clean,task.revision])
- return <form onSubmit={e=>{e.preventDefault();void submit()}} className="grid gap-3 sm:grid-cols-2"><label className="text-sm sm:col-span-2">Title<input required maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} className="mt-1 min-h-11 w-full rounded border border-dark-blue/20 bg-surface px-3"/></label><label className="text-sm">Due date <span className="text-gray">(optional)</span><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="mt-1 min-h-11 w-full rounded border border-dark-blue/20 bg-surface px-3"/></label><label className="text-sm">Priority<select value={priority} onChange={e=>setPriority(e.target.value as CollabTask['priority'])} className="mt-1 min-h-11 w-full rounded border border-dark-blue/20 bg-surface px-3">{['High','Medium','Low'].map(p=><option key={p}>{p}</option>)}</select></label>{canChangeZone ? <label className="text-sm sm:col-span-2">Deadline timezone<select value={zone} onChange={e=>setZone(e.target.value)} className="mt-1 min-h-11 w-full rounded border border-dark-blue/20 bg-surface px-3">{zoneChoices(task.dueZone).map(value=><option key={value} value={value}>{zoneLabel(value)}</option>)}</select></label> : <p className="text-sm text-gray sm:col-span-2">Deadline timezone: {zoneLabel(task.dueZone)}. Only the owner can change this.</p>}<div className="sm:col-span-2"><TimePicker value={time} onChange={setTime} disabled={!date}/></div><div className="flex items-center gap-3 sm:col-span-2"><button disabled={status==='saving'} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue px-4 text-sm text-white disabled:cursor-not-allowed disabled:opacity-70">{status==='saving' && <ButtonSpinner/>}{status==='saving'?'Saving…':'Save details'}</button><span role="status" className="text-sm text-done-ink">{status==='saved'?'✓ Saved':''}</span></div></form>
+ const input = 'mt-1.5 block min-h-11 w-full min-w-0 rounded-lg border border-dark-blue/20 bg-surface px-3 text-base focus:outline-none focus:ring-2 focus:ring-blue/30'
+ return <form onSubmit={e=>{e.preventDefault();void submit()}} className="grid gap-4 sm:grid-cols-2">
+  <label className="text-sm font-semibold sm:col-span-2">Title<input required maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} className={`${input} font-normal`}/></label>
+  <label className="text-sm font-semibold">Due date <span className="font-normal text-gray">(optional)</span><input type="date" value={date} onChange={e=>setDate(e.target.value)} className={`${input} font-normal`}/></label>
+  <div className="text-sm"><p className="font-semibold">Priority</p><PlannerSelect priorityIcons label="Priority" value={priority} className="mt-1.5 w-full" options={['High','Medium','Low'].map(value=>({value,label:value}))} onChange={value=>setPriority(value as CollabTask['priority'])}/></div>
+  {canChangeZone ? <div className="text-sm sm:col-span-2"><p className="font-semibold">Deadline timezone</p><PlannerSelect label="Deadline timezone" value={zone} className="mt-1.5 w-full" options={zoneChoices(task.dueZone).map(value=>({value,label:zoneLabel(value)}))} onChange={setZone}/></div> : <p className="text-sm text-gray sm:col-span-2">Deadline timezone: {zoneLabel(task.dueZone)}. Only the owner can change this.</p>}
+  <div className="sm:col-span-2"><TimePicker value={time} onChange={setTime} disabled={!date}/></div>
+  <div className="flex items-center gap-3 sm:col-span-2"><button disabled={status==='saving'} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue px-4 text-sm font-semibold text-white hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-70">{status==='saving' && <ButtonSpinner/>}{status==='saving'?'Saving…':'Save details'}</button><span role="status" className="text-sm text-done-ink">{status==='saved'?'✓ Saved':''}</span></div>
+ </form>
 }
 
 function SharedResources({files,links,taskId,canEdit,canEditLinks,saving,upload,addLink,removeFile,removeLink}: {
@@ -518,26 +529,29 @@ function SharedResources({files,links,taskId,canEdit,canEditLinks,saving,upload,
   removeFile:(id:string)=>Promise<void>;removeLink:(id:string)=>Promise<void>;
 }) {
   const [url,setUrl]=useState('')
+  // Which resource action is running, so only that button shows its progress.
+  const [busy,setBusy]=useState<string | null>(null)
+  const run=(key:string,work:()=>Promise<unknown>)=>{setBusy(key);return work().finally(()=>setBusy(null))}
   return <div className="min-w-0 space-y-3">
     {canEdit && <>
-      <label className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-blue/30 px-3 text-sm text-link hover:bg-lightest-blue/30 focus-within:outline-2 focus-within:outline-blue">
-        Upload file or image
-        <input aria-label="Upload file or image" disabled={saving} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp" className="sr-only" onChange={e=>{void upload(Array.from(e.target.files || []));e.target.value=''}}/>
+      <label className={`inline-flex min-h-11 items-center gap-2 rounded-lg border border-blue/30 px-3 text-sm text-link focus-within:outline-2 focus-within:outline-blue ${busy==='upload' || saving ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:bg-lightest-blue/30'}`}>
+        {busy==='upload' && <ButtonSpinner />}{busy==='upload' ? 'Uploading…' : 'Upload file or image'}
+        <input aria-label="Upload file or image" disabled={saving || busy!==null} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp" className="sr-only" onChange={e=>{const chosen=Array.from(e.target.files || []);e.target.value='';void run('upload',()=>upload(chosen))}}/>
       </label>
       <p className="text-xs text-gray">PDF, Word, PowerPoint, PNG, JPEG or WebP · 10 MB per file.</p>
     </>}
     {files.map(file=><div key={file.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-dark-blue/15 bg-surface p-2">
       <FileTypeIcon filename={file.name} className="h-8 w-8 shrink-0"/>
-      <a href={`/api/collab/tasks/${taskId}/files/${file.id}`} download title={file.name} className="min-w-0 flex-1 truncate text-sm text-link underline">{file.name}</a>
-      {canEdit && <button disabled={saving} type="button" aria-label={`Remove ${file.name}`} onClick={()=>void removeFile(file.id)} className="min-h-10 shrink-0 rounded px-2 text-xs text-red hover:bg-light-red/30">Remove</button>}
+      <a href={`/api/collab/tasks/${taskId}/files/${file.id}`} download title={file.name} className="min-w-0 flex-1 truncate text-sm text-link underline hover:decoration-2">{file.name}</a>
+      {canEdit && <button disabled={saving || busy!==null} type="button" aria-label={`Remove ${file.name}`} onClick={()=>void run(`file:${file.id}`,()=>removeFile(file.id))} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded px-2 text-xs text-red hover:bg-light-red/30 disabled:opacity-60">{busy===`file:${file.id}` && <ButtonSpinner />}{busy===`file:${file.id}` ? 'Removing…' : 'Remove'}</button>}
     </div>)}
-    {canEditLinks && <form onSubmit={e=>{e.preventDefault();void addLink(url).then(result=>{if(result)setUrl('')})}} className="flex flex-wrap gap-2">
+    {canEditLinks && <form onSubmit={e=>{e.preventDefault();void run('link',()=>addLink(url).then(result=>{if(result)setUrl('')}))}} className="flex flex-wrap gap-2">
       <input aria-label="Resource link" type="url" required maxLength={2048} value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a link (https://…)" className="min-h-11 min-w-0 flex-1 rounded-lg border border-dark-blue/20 bg-surface px-3 text-sm"/>
-      <button disabled={saving || !url.trim()} className="min-h-11 rounded-lg bg-blue px-3 text-sm text-white disabled:opacity-50">Add link</button>
+      <button disabled={saving || busy!==null || !url.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue px-3 text-sm text-white disabled:opacity-50 hover:bg-action-hover">{busy==='link' && <ButtonSpinner />}{busy==='link' ? 'Adding…' : 'Add link'}</button>
     </form>}
     {links.map(link=><div key={link.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-dark-blue/15 bg-surface p-2">
-      <a href={link.url} target="_blank" rel="noreferrer" title={link.url} className="min-w-0 flex-1 truncate text-sm text-link underline">{link.url}</a>
-      {canEditLinks && <button disabled={saving} type="button" onClick={()=>void removeLink(link.id)} className="min-h-10 shrink-0 rounded px-2 text-xs text-red hover:bg-light-red/30">Remove</button>}
+      <a href={link.url} target="_blank" rel="noreferrer" title={link.url} className="min-w-0 flex-1 truncate text-sm text-link underline hover:decoration-2">{link.url}</a>
+      {canEditLinks && <button disabled={saving || busy!==null} type="button" onClick={()=>void run(`link:${link.id}`,()=>removeLink(link.id))} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded px-2 text-xs text-red hover:bg-light-red/30 disabled:opacity-60">{busy===`link:${link.id}` && <ButtonSpinner />}{busy===`link:${link.id}` ? 'Removing…' : 'Remove'}</button>}
     </div>)}
     {!files.length && !links.length && <p className="text-sm text-gray">No resources added yet.</p>}
   </div>

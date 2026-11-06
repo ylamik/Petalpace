@@ -334,7 +334,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
                 {busy && <ButtonSpinner />}
                 {busy ? (isForgot ? 'Sending reset link…' : isReset ? 'Saving password…' : 'Please wait…') : isSignUp ? 'Create account' : isVerify ? 'Verify email' : isForgot ? 'Send reset link' : isReset ? 'Save new password' : 'Sign in'}
               </button>
-              {needsVerification && <button type="button" onClick={() => void submit(true)} className="w-full rounded border border-blue px-4 py-2 text-link">Resend verification email</button>}
+              {needsVerification && <button type="button" onClick={() => void submit(true)} className="w-full rounded border border-blue px-4 py-2 text-link hover:bg-lightest-blue/50">Resend verification email</button>}
               </fieldset>
 
               <p
@@ -350,7 +350,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
                 {signInFailed ? (
                   <>
                     <span className="block font-semibold">We couldn’t sign you in.</span>
-                    <span className="mt-1 block">Check your email and password. New to Petalpace?{' '}<Link to="/sign-up" className="font-semibold text-link underline underline-offset-2">Create an account</Link> or <Link to="/forgot-password" className="font-semibold text-link underline underline-offset-2">reset your password</Link>.</span>
+                    <span className="mt-1 block">Check your email and password. New to Petalpace?{' '}<Link to="/sign-up" className="font-semibold text-link underline underline-offset-2 hover:decoration-2">Create an account</Link> or <Link to="/forgot-password" className="font-semibold text-link underline underline-offset-2 hover:decoration-2">reset your password</Link>.</span>
                   </>
                 ) : notice}
               </p>
@@ -358,15 +358,15 @@ export default function AuthPage({ mode }: AuthPageProps) {
 
             {isForgot && finished && <div className="mt-4 rounded-lg border border-dark-blue/10 bg-beige/40 p-4 text-sm leading-relaxed">
               <p>Open the link in your email, then choose and confirm your new password. The link expires after 30 minutes.</p>
-              <button type="button" onClick={() => { setFinished(false); setNotice('') }} className="mt-3 text-link underline">Try another email or request a new link</button>
+              <button type="button" onClick={() => { setFinished(false); setNotice('') }} className="mt-3 text-link underline hover:decoration-2">Try another email or request a new link</button>
             </div>}
             {isReset && !finished && <Link
               to="/forgot-password"
-              className="mt-4 inline-flex min-h-11 items-center rounded text-sm text-link underline focus-visible:outline-2 focus-visible:outline-blue"
+              className="mt-4 inline-flex min-h-11 items-center rounded text-sm text-link underline focus-visible:outline-2 focus-visible:outline-blue hover:decoration-2"
             >
               Link expired or missing? Request a new one
             </Link>}
-            {finished && <Link to="/sign-in" replace className="mt-4 block rounded bg-blue p-3 text-center font-semibold text-white">{isForgot ? 'Back to sign in' : 'Continue to sign in'}</Link>}
+            {finished && <Link to="/sign-in" replace className="mt-4 block rounded bg-blue p-3 text-center font-semibold text-white hover:bg-action-hover">{isForgot ? 'Back to sign in' : 'Continue to sign in'}</Link>}
 
             <div className="mt-7 border-t border-dark-blue/15 pt-5 text-center text-sm">
               {mode !== 'sign-in' ? (

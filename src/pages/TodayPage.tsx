@@ -268,7 +268,7 @@ export default function TodayPage() {
                   onClick={() => togglePin(task)}
                   aria-label={`Unpin ${task.title}`}
                   aria-pressed={task.pinned}
-                  className="shrink-0 rounded px-1 text-lg text-star"
+                  className="shrink-0 rounded px-1 text-lg text-star transition-transform hover:scale-110"
                 >
                   ★
                 </button>
@@ -344,7 +344,7 @@ export default function TodayPage() {
             <button
               type="button"
               onClick={() => setProgressOpen(true)}
-              className="mt-3 text-sm text-link underline"
+              className="mt-3 text-sm text-link underline hover:decoration-2"
             >
               View activity
             </button>

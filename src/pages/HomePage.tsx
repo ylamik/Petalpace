@@ -138,8 +138,10 @@ const navLinks = [
 export default function HomePage() {
   const reduceMotion = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [feedbackState, setFeedbackState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
-  const [feedbackNotice, setFeedbackNotice] = useState('');
+  const [feedbackState, setFeedbackState] = useState<
+    "idle" | "sending" | "success" | "error"
+  >("idle");
+  const [feedbackNotice, setFeedbackNotice] = useState("");
   const sendingFeedback = useRef(false);
 
   async function submitFeedback(event: FormEvent<HTMLFormElement>) {
@@ -147,29 +149,45 @@ export default function HomePage() {
     if (sendingFeedback.current) return;
     const form = event.currentTarget;
     const data = new FormData(form);
-    if (!String(data.get('message') ?? '').trim()) {
-      setFeedbackState('error'); setFeedbackNotice('Please write a message first.'); return;
+    if (!String(data.get("message") ?? "").trim()) {
+      setFeedbackState("error");
+      setFeedbackNotice("Please write a message first.");
+      return;
     }
     sendingFeedback.current = true;
-    setFeedbackState('sending'); setFeedbackNotice('Sending your feedback…');
+    setFeedbackState("sending");
+    setFeedbackNotice("Sending your feedback…");
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch('/api/feedback', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          feedbackType: String(data.get('feedbackType') ?? ''),
-          message: String(data.get('message') ?? '').trim(),
-          email: String(data.get('email') ?? '').trim(),
-          website: String(data.get('website') ?? ''),
+          feedbackType: String(data.get("feedbackType") ?? ""),
+          message: String(data.get("message") ?? "").trim(),
+          email: String(data.get("email") ?? "").trim(),
+          website: String(data.get("website") ?? ""),
         }),
         signal: controller.signal,
       });
       const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Could not send feedback. Please try again later.');
-      setFeedbackState('success'); setFeedbackNotice('Thank you! Your feedback has been sent.'); form.reset();
+      if (!response.ok || !result?.ok)
+        throw new Error(
+          result?.error || "Could not send feedback. Please try again later.",
+        );
+      setFeedbackState("success");
+      setFeedbackNotice("Thank you! Your feedback has been sent.");
+      form.reset();
     } catch (error) {
-      setFeedbackState('error'); setFeedbackNotice(controller.signal.aborted ? 'The request timed out. Please try again later.' : error instanceof Error ? error.message : 'Could not send feedback. Please try again later.');
+      setFeedbackState("error");
+      setFeedbackNotice(
+        controller.signal.aborted
+          ? "The request timed out. Please try again later."
+          : error instanceof Error
+            ? error.message
+            : "Could not send feedback. Please try again later.",
+      );
     } finally {
       window.clearTimeout(timeoutId);
       sendingFeedback.current = false;
@@ -491,17 +509,16 @@ export default function HomePage() {
 
                 <div className="min-w-0 flex-1">
                   <h3 className="text-xl font-semibold">Add a task</h3>
-
                   <p className="mt-1 leading-snug">
                     Capture an idea and choose a due date.
                   </p>
-
                   <img
                     src="/images/add-a-task.png"
                     alt=""
                     aria-hidden="true"
                     className="mx-auto mt-5 h-auto rounded w-full max-w-[340px] object-contain md:mx-0"
-                  />                </div>
+                  />{" "}
+                </div>
               </motion.li>
 
               {/* Step 2 */}
@@ -564,7 +581,7 @@ export default function HomePage() {
                     alt=""
                     aria-hidden="true"
                     className="mx-auto mt-5 h-auto w-full max-w-[340px] rounded object-contain md:mx-0"
-                  />                
+                  />
                 </div>
               </motion.li>
 
@@ -593,12 +610,12 @@ export default function HomePage() {
                     Mark tasks done and celebrate each step.
                   </p>
 
-                   <img
+                  <img
                     src="/images/celebrate-your-progress.png"
                     alt=""
                     aria-hidden="true"
                     className="mx-auto mt-5 h-auto w-full max-w-[340px] rounded object-contain md:mx-0"
-                  />     
+                  />
                 </div>
               </motion.li>
             </ol>
@@ -748,14 +765,19 @@ export default function HomePage() {
           <motion.form
             className="mt-6 rounded-lg border border-dark-blue/20 bg-surface p-5 shadow-sm sm:p-7"
             onSubmit={submitFeedback}
-            aria-busy={feedbackState === 'sending'}
+            aria-busy={feedbackState === "sending"}
             initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 28 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ amount: 0.15 }}
             transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div hidden aria-hidden="true"><label>Website<input name="website" tabIndex={-1} autoComplete="off" /></label></div>
-            <fieldset disabled={feedbackState === 'sending'}>
+            <div hidden aria-hidden="true">
+              <label>
+                Website
+                <input name="website" tabIndex={-1} autoComplete="off" />
+              </label>
+            </div>
+            <fieldset disabled={feedbackState === "sending"}>
               <legend className="font-semibold">Feedback type</legend>
 
               <div className="mt-2 flex flex-wrap gap-2">
@@ -806,28 +828,34 @@ export default function HomePage() {
                 maxLength={254}
                 type="email"
                 autoComplete="email"
-                placeholder="you@example.com"
+                placeholder="Enter email"
                 aria-describedby="feedback-email-hint"
                 className="mt-2 block w-full rounded-md border border-dark-blue/20 bg-surface px-4 py-3 placeholder:text-gray focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue"
               />
 
               <p id="feedback-email-hint" className="mt-2 text-sm">
-                Optional—leave your email if you’d like a reply. You can send feedback without it.
+                Optional—leave your email if you’d like a reply. You can send
+                feedback without it.
               </p>
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p id="feedback-status" role="status" aria-live="polite" className={`text-sm ${feedbackState === 'error' ? 'text-red' : 'text-gray'}`}>
+              <p
+                id="feedback-status"
+                role="status"
+                aria-live="polite"
+                className={`text-sm ${feedbackState === "error" ? "text-red" : "text-gray"}`}
+              >
                 {feedbackNotice}
               </p>
 
               <button
                 type="submit"
-                disabled={feedbackState === 'sending'}
+                disabled={feedbackState === "sending"}
                 aria-describedby="feedback-status"
                 className="shrink-0 rounded-md bg-blue px-5 py-2.5 font-semibold text-white hover:bg-action-hover disabled:cursor-wait disabled:opacity-60"
               >
-                {feedbackState === 'sending' ? 'Sending…' : 'Send feedback'}
+                {feedbackState === "sending" ? "Sending…" : "Send feedback"}
               </button>
             </div>
           </motion.form>
@@ -938,7 +966,10 @@ export default function HomePage() {
           <div className="mt-6 max-w-64"></div>
           <p className="mt-6 text-sm">
             © {new Date().getFullYear()} · Created by Mikyla Caras
-            <span className="block sm:inline"><span className="hidden sm:inline"> · </span>Assisted by Erica Espiña</span>
+            <span className="block sm:inline">
+              <span className="hidden sm:inline"> · </span>Assisted by Erica
+              Espiña
+            </span>
           </p>
         </div>
       </footer>

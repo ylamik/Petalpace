@@ -421,7 +421,7 @@ export default function CalendarPage({
 
       {undated.length > 0 && (
         <details className="mt-6 rounded-2xl border border-dark-blue/10 bg-surface p-4">
-          <summary className="cursor-pointer font-semibold">
+          <summary className="cursor-pointer font-semibold hover:underline">
             No due date ({undated.length})
           </summary>
           <p className="my-3 text-sm text-gray">

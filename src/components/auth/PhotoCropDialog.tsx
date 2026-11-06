@@ -69,7 +69,7 @@ export default function PhotoCropDialog({ file, onCancel, onSave }: Props) {
           <label className="block text-sm">Move up or down<input type="range" min="0" max="100" value={position.y} onChange={event=>setPosition(p=>({...p,y:Number(event.target.value)}))} className="mt-1 block w-full accent-blue"/></label>
         </fieldset>
         {error && <p role="alert" className="mt-3 text-sm text-red">{error}</p>}
-        <div className="mt-6 flex flex-wrap justify-end gap-2"><button type="button" disabled={saving} onClick={onCancel} className="min-h-11 rounded-lg border border-blue px-4 py-2 text-sm font-semibold text-link disabled:opacity-50">Cancel</button><button type="button" disabled={!source || saving} onClick={()=>setConfirm(true)} className="min-h-11 rounded-lg bg-blue px-4 py-2 text-sm font-semibold text-white hover:bg-action-hover disabled:opacity-50">{saving ? 'Saving...' : 'Save photo'}</button></div>
+        <div className="mt-6 flex flex-wrap justify-end gap-2"><button type="button" disabled={saving} onClick={onCancel} className="min-h-11 rounded-lg border border-blue px-4 py-2 text-sm font-semibold text-link disabled:opacity-50 hover:bg-lightest-blue/50">Cancel</button><button type="button" disabled={!source || saving} onClick={()=>setConfirm(true)} className="min-h-11 rounded-lg bg-blue px-4 py-2 text-sm font-semibold text-white hover:bg-action-hover disabled:opacity-50">{saving ? 'Saving...' : 'Save photo'}</button></div>
       </div>
     </dialog>
     {confirm && <ConfirmTaskDialog title="Save this profile photo?" message="Your profile picture will use the circle preview you have chosen." confirmLabel="Save photo" cancelLabel="Keep adjusting" destructive={false} onCancel={()=>setConfirm(false)} onConfirm={()=>void save()}/>}

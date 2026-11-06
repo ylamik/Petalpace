@@ -2,6 +2,8 @@
 
 A calm, personal planning app for anyone who wants to stay on top of their days. Petalpace gives you one place for your tasks, deadlines, notes, and files — without the noise of heavy project-management tools.
 
+**Live site: [petalpace.duckdns.org](https://petalpace.duckdns.org)**
+
 > Built with React, TypeScript, Node.js, and SQLite.
 
 ---
@@ -284,7 +286,7 @@ Output goes to `dist/`. The production server serves the SPA automatically from 
 
 ## Deployment
 
-Petalpace is live at **https://petalpace.duckdns.org**, running on a $5/month Vultr server (Ubuntu, Singapore) with nginx, free HTTPS from Let's Encrypt, a free Duck DNS address, and email through Gmail.
+Petalpace is live at **[petalpace.duckdns.org](https://petalpace.duckdns.org)**, running on a $5/month Vultr server (Ubuntu, Singapore) with nginx, free HTTPS from Let's Encrypt, a free Duck DNS address, and email through Gmail.
 
 The full step-by-step guide is in [`deploy/DEPLOY.md`](deploy/DEPLOY.md). In short:
 

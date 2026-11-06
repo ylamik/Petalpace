@@ -151,7 +151,7 @@ export default function UpcomingPage() {
               type="button"
               disabled={!selectedShown.length}
               onClick={() => setDeleteOpen(true)}
-              className="min-h-10 rounded-md bg-light-red px-3 text-red disabled:opacity-50"
+              className="min-h-10 rounded-md bg-light-red px-3 text-red disabled:opacity-50 hover:bg-light-red/70"
             >
               Delete selected ({selectedShown.length})
             </button>
@@ -234,7 +234,7 @@ export default function UpcomingPage() {
               </p>
               <Link
                 to="/today"
-                className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-blue px-4 py-2 font-semibold text-white"
+                className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-blue px-4 py-2 font-semibold text-white hover:bg-action-hover"
               >
                 Go to Today
               </Link>
@@ -246,7 +246,7 @@ export default function UpcomingPage() {
           onToggle={(event) => setMissedOpen(event.currentTarget.open)}
           className="mt-5 border-t border-dark-blue/15 pt-4"
         >
-          <summary className="cursor-pointer text-base font-semibold text-red">
+          <summary className="cursor-pointer text-base font-semibold text-red hover:underline">
             Missed deadlines ({missed.length})
           </summary>
           {missed.length > 0 && (
@@ -267,7 +267,7 @@ export default function UpcomingPage() {
           onToggle={(event) => setCompletedOpen(event.currentTarget.open)}
           className="mt-5 border-t border-dark-blue/15 pt-4"
         >
-          <summary className="cursor-pointer text-base font-semibold">
+          <summary className="cursor-pointer text-base font-semibold hover:underline">
             Completed ({completed.length})
           </summary>
           <ul className="mt-3 space-y-3">{completed.map(renderRow)}</ul>

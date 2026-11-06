@@ -133,7 +133,7 @@ export default function ProfileMenu({ variant = 'avatar' }: { variant?: 'avatar'
         {user.photoUrl && <button type="button" disabled={busy} onClick={() => ask('remove')} className={item}>Remove photo</button>}
         <div className="flex min-h-9 items-center gap-2 rounded-lg hover:bg-beige">
           <button type="button" onClick={() => { setOpen(false); setRemindersOpen(true) }} className={`${item} min-w-0 flex-1 hover:bg-transparent`}>Email reminders</button>
-          {reminders && <button type="button" role="switch" aria-checked={reminders.enabled} aria-label="Send email reminders" onClick={() => void toggleReminders()} className={`relative mr-2 h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue ${reminders.enabled ? 'bg-blue' : 'bg-light-gray'}`}>
+          {reminders && <button type="button" role="switch" aria-checked={reminders.enabled} aria-label="Send email reminders" onClick={() => void toggleReminders()} className={`relative mr-2 h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue ${reminders.enabled ? 'bg-blue' : 'bg-light-gray'} hover:opacity-85`}>
             <span aria-hidden="true" className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-[left] ${reminders.enabled ? 'left-[18px]' : 'left-0.5'}`} />
           </button>}
         </div>

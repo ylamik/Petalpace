@@ -24,7 +24,7 @@ function SpaceContent({ spaceId }: { spaceId: string }) {
   if (!space) return (
     <div>
       <h1 className="text-3xl font-bold">Space not found</h1>
-      <Link to="/spaces/new" className="mt-4 inline-block text-link underline">
+      <Link to="/spaces/new" className="mt-4 inline-block text-link underline hover:decoration-2">
         Create a space
       </Link>
     </div>

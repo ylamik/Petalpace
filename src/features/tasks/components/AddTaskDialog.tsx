@@ -214,7 +214,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
             <button type="button" onClick={() => fileRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)}
               onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(Array.from(e.dataTransfer.files)) }}
-              className={`flex min-h-24 w-full items-center justify-center gap-3 rounded-lg border border-dashed p-4 text-left ${dragging ? 'border-blue bg-lightest-blue/40' : 'border-dark-blue/20 bg-page'}`}>
+              className={`flex min-h-24 w-full items-center justify-center gap-3 rounded-lg border border-dashed p-4 text-left ${dragging ? 'border-blue bg-lightest-blue/40' : 'border-dark-blue/20 bg-page'} hover:border-blue hover:bg-lightest-blue/30`}>
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-10 w-10 shrink-0"><path d="M7 18H5a4 4 0 0 1-1-7.9 8 8 0 0 1 15.6-1.5A5 5 0 0 1 19 18h-2" /><path d="M12 21V11m-4 4 4-4 4 4" /></svg>
               <span><span className="block text-sm">Drop files here or <span className="text-link">browse files</span></span><span className="mt-1 block text-xs text-gray">PDF, DOC, DOCX, PPT, PPTX · up to 10 MB each</span></span>
             </button>
@@ -235,7 +235,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
                   <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-light-gray/50">
                     <img src="/icons/link.svg" alt="" className="h-4 w-4 object-contain" />
                   </span>
-                  <a href={link} target="_blank" rel="noopener noreferrer" title={link} className="min-w-0 flex-1 truncate text-sm text-link underline">{link}</a>
+                  <a href={link} target="_blank" rel="noopener noreferrer" title={link} className="min-w-0 flex-1 truncate text-sm text-link underline hover:decoration-2">{link}</a>
                   <button type="button" aria-label={`Remove link ${link}`} onClick={() => setLinks((current) => current.filter((item) => item !== link))} className="min-h-10 text-xs text-link hover:underline">Remove</button>
                 </li>
               ))}

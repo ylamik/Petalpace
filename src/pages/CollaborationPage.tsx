@@ -1,4 +1,5 @@
 import TimePicker from "../features/tasks/components/TimePicker";
+import PlannerSelect from "../components/ui/PlannerSelect";
 import { usePlannerSync } from "../hooks/usePlannerSync";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -144,18 +145,17 @@ function CreateTaskDialog({
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm font-medium">
+            <div className="block text-sm font-medium">
               Priority
-              <select
+              <PlannerSelect
+                priorityIcons
+                label="Priority"
                 value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                className="mt-1.5 min-h-11 w-full rounded-lg border border-dark-blue/20 bg-surface px-3 text-base focus-visible:outline-blue"
-              >
-                {["High", "Medium", "Low"].map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
-            </label>
+                className="mt-1.5 w-full font-normal"
+                options={["High", "Medium", "Low"].map((value) => ({ value, label: value }))}
+                onChange={setPriority}
+              />
+            </div>
             <label className="block text-sm font-medium">
               Due date <span className="font-normal text-gray">(optional)</span>
               <input
@@ -185,7 +185,7 @@ function CreateTaskDialog({
                     setCustom("");
                   }}
                   style={{ backgroundColor: s }}
-                  className={`h-8 w-8 rounded-full border-2 border-white ${!custom && color === s ? "ring-2 ring-blue ring-offset-1" : ""}`}
+                  className={`h-8 w-8 rounded-full border-2 border-white ${!custom && color === s ? "ring-2 ring-blue ring-offset-1" : ""} transition-transform hover:scale-110`}
                 />
               ))}
               <label
