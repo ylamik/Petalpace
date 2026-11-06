@@ -32,6 +32,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [notice, setNotice] = useState('')
+  const [signInFailed, setSignInFailed] = useState(false)
 
   async function submit(resend = false) {
     if (busyRef.current || !formRef.current?.reportValidity()) return
@@ -43,6 +44,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
     busyRef.current = true
     setBusy(true)
     setNotice('')
+    setSignInFailed(false)
     try {
       if (mode === 'sign-in' && !resend) {
         await signIn(email, password)
@@ -58,6 +60,8 @@ export default function AuthPage({ mode }: AuthPageProps) {
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Please try again.')
       setNeedsVerification(error instanceof AuthError && error.code === 'EMAIL_UNVERIFIED')
+      // Same message whether or not the email has an account, so the page never reveals who has signed up.
+      setSignInFailed(mode === 'sign-in' && !resend && !(error instanceof AuthError && error.code === 'EMAIL_UNVERIFIED') && /incorrect/i.test(error instanceof Error ? error.message : ''))
     } finally { busyRef.current = false; setBusy(false) }
   }
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -326,7 +330,12 @@ export default function AuthPage({ mode }: AuthPageProps) {
                     : 'sr-only'
                 }
               >
-                {notice}
+                {signInFailed ? (
+                  <>
+                    <span className="block font-semibold">We couldn’t sign you in.</span>
+                    <span className="mt-1 block">Check your email and password. New to Petalpace?{' '}<Link to="/sign-up" className="font-semibold text-link underline underline-offset-2">Create an account</Link> or <Link to="/forgot-password" className="font-semibold text-link underline underline-offset-2">reset your password</Link>.</span>
+                  </>
+                ) : notice}
               </p>
             </form>
 
