@@ -4,6 +4,7 @@ import DeadlineLabel from './DeadlineLabel'
 import TaskFilterBar from './TaskFilters'
 import { applyTaskFilters, defaultTaskFilters, toolbarButton } from './taskFilterValues'
 import { StepsIcon } from './StepsCount'
+import { clickableCard, openFromCard } from './cardClick'
 import TaskStatusSelect from './TaskStatusSelect'
 import TaskSpaceBadge from './TaskSpaceBadge'
 import { useState } from 'react'
@@ -18,11 +19,11 @@ export function TaskRow<T extends RowTask>({ task, onOpen, onPin, onStatus, hide
   const missed=!task.done && isDeadlineOverdue(task,now)
   const showDeadline=!hideDue || !!task.dueTime || !effectiveDue(task)
   const status = getStatus(task)
-  return <li className={`rounded-lg border p-3 shadow-sm sm:p-4 ${task.done ? 'border-[#91AE87]/60 bg-light-green' : missed ? 'border-red/50 bg-light-pink/40' : 'border-dark-blue/15 bg-surface'}`}>
+  return <li onClick={event => openFromCard(event, () => onOpen(task))} className={`${clickableCard} rounded-lg border p-3 shadow-sm sm:p-4 ${task.done ? 'border-[#91AE87]/60 bg-light-green' : missed ? 'border-red/50 bg-light-pink/40' : 'border-dark-blue/15 bg-surface'}`}>
     <div className="flex flex-wrap items-start justify-between gap-3">
       {onSelect && <label className="flex h-11 w-8 shrink-0 cursor-pointer items-center justify-center"><input type="checkbox" checked={selected} onChange={onSelect} aria-label={`Select ${task.title} for deletion`} className="h-4 w-4 accent-blue"/></label>}
       <div className="min-w-0 flex-1 basis-44">
-        <button type="button" onClick={() => onOpen(task)} aria-haspopup="dialog" title={task.title} className="block w-full truncate text-left font-serif text-base font-semibold lg:text-lg hover:underline focus-visible:outline-blue">{task.title}</button>
+        <button type="button" onClick={() => onOpen(task)} aria-haspopup="dialog" title={task.title} className="block w-full cursor-pointer truncate text-left font-serif text-base font-semibold group-hover:underline lg:text-lg focus-visible:outline-blue">{task.title}</button>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
           <TaskSpaceBadge name={task.space} />
           {missed && <span className="rounded-full border border-red/30 bg-light-red px-2 py-1 text-xs font-medium text-red">Deadline missed</span>}

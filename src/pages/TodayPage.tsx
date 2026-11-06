@@ -1,6 +1,7 @@
 import { taskDaysUntil } from '../features/tasks/components/taskPresentation'
 import { usePlannerClock } from '../hooks/usePlannerClock'
 import StepsCount from "../features/tasks/components/StepsCount";
+import { clickableCard, openFromCard } from "../features/tasks/components/cardClick";
 import DeadlineLabel from '../features/tasks/components/DeadlineLabel';
 import { useSpaces, type SpaceTask as Task } from "../features/spaces/spaces";
 import { compareTasks, effectiveDue, isDeadlineOverdue } from "../features/tasks/components/taskPresentation";
@@ -228,7 +229,8 @@ export default function TodayPage() {
           {topTasks.map((task, index) => (
             <article
               key={task.id}
-              className={`${cardShadow} min-w-0 p-3 ${
+              onClick={(event) => openFromCard(event, () => setSelectedTaskId(task.id))}
+              className={`${cardShadow} ${clickableCard} min-w-0 p-3 ${
                 ["bg-light-pink", "bg-light-yellow", "bg-light-green"][index]
               }`}
             >
@@ -244,7 +246,7 @@ export default function TodayPage() {
                       onClick={() => setSelectedTaskId(task.id)}
                       aria-haspopup="dialog"
                       title={task.title}
-                      className="block w-full truncate text-left hover:underline focus-visible:outline-blue"
+                      className="block w-full cursor-pointer truncate text-left group-hover:underline focus-visible:outline-blue"
                     >
                       {task.title}
                     </button>
@@ -388,7 +390,7 @@ export default function TodayPage() {
                       type="button"
                       onClick={() => setSelectedTaskId(task.id)}
                       aria-haspopup="dialog"
-                      className="flex w-full cursor-pointer items-center gap-3 rounded-xl p-1.5 text-left hover:bg-beige/60 focus-visible:outline-2 focus-visible:outline-blue"
+                      className="group flex w-full cursor-pointer items-center gap-3 rounded-xl p-1.5 text-left hover:bg-beige/60 focus-visible:outline-2 focus-visible:outline-blue"
                     >
                       <span className="flex h-12 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-beige">
                         <span className="text-[0.6875rem] font-semibold leading-tight tracking-wide text-gray">
@@ -397,7 +399,7 @@ export default function TodayPage() {
                         <span className="font-serif text-lg font-semibold leading-tight">{due.getDate()}</span>
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[0.9375rem] font-medium" title={task.title}>{task.title}</span>
+                        <span className="block truncate text-[0.9375rem] font-medium group-hover:underline" title={task.title}>{task.title}</span>
                         <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-gray">
                           <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                           <span className="truncate">{task.space}</span>

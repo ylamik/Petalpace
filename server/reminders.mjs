@@ -3,9 +3,19 @@ import { emailReady, mailSender } from './mailer.mjs'
 import { deadlineInstant, validZone } from '../src/features/tasks/deadlineZone.ts'
 export function setupReminders(db){db.exec(`CREATE TABLE IF NOT EXISTS reminder_settings(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,enabled INTEGER NOT NULL DEFAULT 0,zone TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS reminder_deliveries(key TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,payload TEXT NOT NULL,created_at INTEGER NOT NULL,next_try INTEGER NOT NULL,sent_at INTEGER,attempts INTEGER NOT NULL DEFAULT 0);`)}
-const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
-export function emailLayout(title,body,link,label='Open Petalpace'){
- return `<html><body style="margin:0;background:#f8f5ee;color:#2f3c74;font-family:Georgia,serif"><div style="max-width:560px;margin:24px auto;padding:28px;background:#fff;border:1px solid #ddd9cf;border-radius:16px"><p style="color:#4c74a1">Petalpace</p><h1 style="font-size:26px">${escape(title)}</h1>${body}<p style="margin-top:24px"><a href="${escape(link)}" style="display:inline-block;background:#4c74a1;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none">${escape(label)}</a></p><p style="font-size:14px;color:#595959">Small steps. Room to bloom.</p></div></body></html>`
+import { badges, emailLayout, escapeHtml, logoUrl, taskPanel } from './email-layout.mjs'
+export { emailLayout } from './email-layout.mjs'
+
+// "Saturday, November 7 · 2:30 PM (Asia/Manila)" from the stored date, time and zone.
+export function describeDeadline(dueDate, dueTime, zone) {
+ const day = new Date(dueDate + 'T12:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric' })
+ const time = dueTime ? new Date(`2000-01-01T${dueTime}:00Z`).toLocaleTimeString('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' }) : 'end of day'
+ return `${day} · ${time} (${zone.replaceAll('_', ' ')})`
+}
+const reminderCopy = {
+ soon: { title: 'A deadline is coming up', intro: 'This task is due in the next few days. A small start now makes it lighter later.' },
+ day: { title: 'Your task is due soon', intro: 'This task is due within the next day. You still have time.' },
+ missed: { title: 'A deadline has passed', intro: 'This task is past its deadline. You can still finish it, or choose a new date.' },
 }
 export function reminderPhase(task,now,zone){
  if(task.done || task.started || task.blocked || !task.dueDate)return null
@@ -30,7 +40,7 @@ export function createReminderWorker({db,env=process.env,send,now=Date.now}){
   if(cached?.revision===revision)return cached.tasks
   const tasks=JSON.parse(db.prepare('SELECT data FROM planners WHERE user_id=?').get(user).data).tasks
    .filter(task=>task.dueDate && !task.done && !task.started && !task.blocked)
-   .map(({id,title,dueDate,dueTime,dueZone})=>({id,title,dueDate,dueTime,dueZone}))
+   .map(({id,title,space,dueDate,dueTime,dueZone})=>({id,title,space,dueDate,dueTime,dueZone}))
   deadlines.set(user,{revision,tasks})
   return tasks
  }
@@ -45,8 +55,8 @@ export function createReminderWorker({db,env=process.env,send,now=Date.now}){
    for(const setting of settings){
     if(budget<=0)break
     const tasks=deadlineTasks(setting.user_id)
-    const shared=db.prepare('SELECT c.* FROM collab_tasks c JOIN collab_members m ON m.task_id=c.id WHERE m.user_id=?').all(setting.user_id).map(t=>({id:'shared:'+t.id,title:t.title,dueDate:t.due_date,dueTime:t.due_time,dueZone:t.due_zone,done:t.status==='done',started:t.status==='progress',blocked:t.status==='blocked'}))
-    for(const task of [...tasks,...shared]){
+    const sharedTasks=db.prepare('SELECT c.* FROM collab_tasks c JOIN collab_members m ON m.task_id=c.id WHERE m.user_id=?').all(setting.user_id).map(t=>({id:'shared:'+t.id,title:t.title,dueDate:t.due_date,dueTime:t.due_time,dueZone:t.due_zone,done:t.status==='done',started:t.status==='progress',blocked:t.status==='blocked'}))
+    for(const task of [...tasks,...sharedTasks]){
      const phase=reminderPhase(task,now(),setting.zone)
      if(!phase)continue
      const key=createHash('sha256').update(JSON.stringify([setting.user_id,task.id,task.dueDate,task.dueTime,task.dueZone || setting.zone,phase])).digest('hex')
@@ -55,15 +65,17 @@ export function createReminderWorker({db,env=process.env,send,now=Date.now}){
     const queue=db.prepare('SELECT * FROM reminder_deliveries WHERE user_id=? AND sent_at IS NULL AND next_try<=? AND created_at>? ORDER BY created_at LIMIT 20').all(setting.user_id,now(),now()-23*3600000)
     for(const job of queue){
      if(budget--<=0)break
-     const payload=JSON.parse(job.payload),task=[...tasks,...shared].find(t=>t.id===payload.id)
+     const payload=JSON.parse(job.payload),task=[...tasks,...sharedTasks].find(t=>t.id===payload.id)
      if(!task || createHash('sha256').update(JSON.stringify([setting.user_id,task.id,task.dueDate,task.dueTime,task.dueZone || setting.zone,payload.phase])).digest('hex')!==job.key || reminderPhase(task,now(),setting.zone)!==payload.phase){db.prepare('UPDATE reminder_deliveries SET sent_at=? WHERE key=?').run(now(),job.key);continue}
-     const title=payload.phase==='missed'?'A deadline has passed':payload.phase==='day'?'Due within 24 hours':'A deadline is approaching'
-     const zone=task.dueZone || setting.zone
-     const deadline=`${task.dueDate} ${task.dueTime || 'end of day'} (${zone})`
-     const link=new URL(task.id.startsWith('shared:')?'/collaboration/'+task.id.slice(7):'/tasks',env.APP_URL || 'http://localhost:5173').href
-     const text=`${title}\n${task.title}\nDue ${deadline}\n\n${link}\n\nYou can finish, reschedule, or mark the task done. Manage email reminders in your profile. In-progress and completed tasks do not receive reminders.`
+     const copy=reminderCopy[payload.phase]
+     const shared=task.id.startsWith('shared:')
+     const deadline=describeDeadline(task.dueDate,task.dueTime,task.dueZone || setting.zone)
+     const link=new URL(shared?'/collaboration/'+task.id.slice(7):'/tasks',env.APP_URL || 'http://localhost:5173').href
+     const footer='You get this because email reminders are on. Turn them off in Petalpace under Account &amp; settings → Email reminders. In-progress, blocked and finished tasks never get reminders.'
+     const text=`${copy.title}\n\n${task.title}\nDue: ${deadline}\n${shared?'Shared task':`Space: ${task.space || 'Personal'}`}\n\n${copy.intro}\n\nOpen Petalpace: ${link}\n\nYou get this because email reminders are on. Turn them off in Petalpace under Account & settings → Email reminders.`
+     const html=emailLayout(copy.title,`<p style="margin:0">${escapeHtml(copy.intro)}</p>${taskPanel(task.title,[['Due',deadline],shared?['Type','Shared task']:['Space',task.space || 'Personal']],payload.phase==='missed'?'#e8a59a':payload.phase==='day'?'#eebd84':'#ccdbef')}`,link,shared?'Open shared task':'Open my tasks',{preheader:`${task.title} · ${deadline}`,badge:badges[payload.phase],footer,logo:logoUrl(env)})
      // Freeze message at first attempt for provider idempotency on retries.
-     const message=payload.message || {from:env.AUTH_FROM || env.FEEDBACK_FROM,to:[setting.email],subject:`Petalpace · ${title}`,text,html:emailLayout(title,`<p style="font-size:18px">${escape(task.title)}</p><p>Due ${escape(deadline)}</p><p>You can finish, reschedule, or mark this task done.</p><p style="font-size:14px">Manage email reminders in your profile. In-progress and completed tasks do not receive these reminders.</p>`,link)}
+     const message=payload.message || {from:env.AUTH_FROM || env.FEEDBACK_FROM,to:[setting.email],subject:`${copy.title}: ${task.title}`,text,html}
      db.prepare('UPDATE reminder_deliveries SET payload=?,next_try=?,attempts=attempts+1 WHERE key=?').run(JSON.stringify({...payload,message}),now()+15*60000,job.key)
      try{
       const response=await send('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json','Idempotency-Key':`reminder-${job.key}`},body:JSON.stringify(message),signal:AbortSignal.timeout(12000)})

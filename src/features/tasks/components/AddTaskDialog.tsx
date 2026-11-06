@@ -165,7 +165,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
               <TaskSpaceSelect names={spaceOptions} value={space} onChange={setSpace} required className={field}/>
             </div>
             <div>
-              <label htmlFor="task-date" className="mb-1 block font-semibold">Due date</label>
+              <label htmlFor="task-date" className="mb-1 block font-semibold">Due date <span className="font-normal text-gray">(optional)</span></label>
               <input ref={dateRef} id="task-date" type="date" value={dueDate} onChange={(e) => {setDueDate(e.target.value);if(!e.target.value)setDueTime('')}} className={field} />
             </div>
           </div>

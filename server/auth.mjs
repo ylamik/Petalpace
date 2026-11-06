@@ -2,6 +2,7 @@ import { createReminderSettingsHandler } from './reminders.mjs'
 import { clientIP } from './client-ip.mjs'
 import { createWorkQueue, hashConcurrency } from './work-queue.mjs'
 import { emailReady, mailSender } from './mailer.mjs'
+import { emailLayout, logoUrl } from './email-layout.mjs'
 import { createPlannerHandler } from './planner.mjs'
 import { buildZip } from './zip-builder.mjs'
 import { registerSSE } from './sse-broker.mjs'
@@ -74,7 +75,11 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
       const response = await send('https://api.resend.com/emails', {
         method: 'POST', headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ from, to: [user.email], subject: action,
-          text: `${action}\n\nOpen this link and confirm on the page:\n${link.href}\n\nThis link expires in 30 minutes and can be used once. If you did not request this, ignore this email. Never forward this link.` }),
+          text: `${action}\n\nOpen this link and confirm on the page:\n${link.href}\n\nThis link expires in 30 minutes and can be used once. If you did not request this, ignore this email. Never forward this link.`,
+          html: emailLayout(purpose === 'verify' ? 'Welcome to Petalpace' : 'Reset your password',
+            purpose === 'verify' ? '<p style="margin:0">Confirm your email to finish creating your account. Then you can start planning, one small step at a time.</p>' : '<p style="margin:0">We got a request to reset your Petalpace password. Choose a new one with the button below.</p>',
+            link.href, purpose === 'verify' ? 'Verify my email' : 'Choose a new password',
+            { preheader: 'This link expires in 30 minutes.', footer: 'This link expires in 30 minutes and works once. If you didn’t ask for this, you can ignore this email. Never forward this link.', logo: logoUrl(env) }) }),
         signal: AbortSignal.timeout(12000),
       })
       const result = await response.json().catch(() => null)

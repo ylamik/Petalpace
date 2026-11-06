@@ -8,7 +8,7 @@ import TaskStatusSelect from './TaskStatusSelect'
 import TaskSpaceBadge from './TaskSpaceBadge'
 import FileTypeIcon from '../../../components/ui/FileTypeIcon'
 import { ButtonSpinner } from '../../../components/ui/PageLoader'
-import { TITLE_LIMIT, validDueTime } from './taskPresentation'
+import { TITLE_LIMIT, remapCompleted, validDueTime } from './taskPresentation'
 import { useSpaces } from '../../spaces/spaces'
 import ConfirmTaskDialog from './ConfirmTaskDialog'
 import { getStatus, statusChange, UNPINNED_ON_DONE } from './taskPresentation'
@@ -70,11 +70,12 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
   const [editingNotes, setEditingNotes] = useState(false)
   const [adding, setAdding] = useState(false)
   const [step, setStep] = useState('')
+  const [editingStep, setEditingStep] = useState<{ index: number; text: string } | null>(null)
   const [link, setLink] = useState('')
   const [error, setError] = useState('')
   const [attachmentNotice,setAttachmentNotice] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const dirty = JSON.stringify(task) !== JSON.stringify(originalTask) || (task.files ?? []).some((file, i) => file !== originalTask.files?.[i]) || !!step.trim() || !!link.trim()
+  const dirty = JSON.stringify(task) !== JSON.stringify(originalTask) || (task.files ?? []).some((file, i) => file !== originalTask.files?.[i]) || !!step.trim() || !!link.trim() || !!editingStep
   const steps = task.steps ?? []
   const completed = task.completedSteps ?? []
   const completedCount = steps.filter((_, index) => completed.includes(index)).length
@@ -129,7 +130,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
           <div className="my-5 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
             <div className="min-w-0 text-sm"><p>Move to space</p><TaskSpaceSelect label="Move to space" names={spaceOptions} value={task.space} onChange={space=>onChange({space})} className={field}/><p className="mt-1 text-xs text-gray">Choose a space, then Save changes.</p></div>
             <div className="min-w-0 text-sm"><p>Priority</p><PlannerSelect priorityIcons label="Priority" value={task.priority} onChange={value=>onChange({priority:value as TaskDraft['priority']})} options={['High','Medium','Low'].map(value=>({value,label:value}))} className="mt-1 w-full"/></div>
-            <label className="min-w-0 text-sm min-[360px]:col-span-2">Due date<input type="date" className={field} value={task.dueDate ?? ''} onChange={(event) => { const now = new Date(); const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; onChange({ dueDate: event.target.value, dueToday: event.target.value === today, dueTime: event.target.value ? task.dueTime : '' }) }} /></label>
+            <label className="min-w-0 text-sm min-[360px]:col-span-2">Due date <span className="text-gray">(optional)</span><input type="date" className={field} value={task.dueDate ?? ''} onChange={(event) => { const now = new Date(); const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; onChange({ dueDate: event.target.value, dueToday: event.target.value === today, dueTime: event.target.value ? task.dueTime : '' }) }} /></label>
           </div>
           <div className="mb-5"><p className="text-xs text-gray">Deadline timezone: {task.dueZone || Intl.DateTimeFormat().resolvedOptions().timeZone}</p><TimePicker value={task.dueTime ?? ''} onChange={dueTime=>onChange({dueTime})} disabled={!task.dueDate}/></div>
         </header>
@@ -139,7 +140,20 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
         </section>
         <section className="border-t border-dark-blue/15 py-4">
           <div className="flex items-center gap-4"><h3 className="font-bold">Steps</h3><div className="flex-1"><p className="mb-1 text-right text-xs text-gray">{completedCount} of {steps.length} completed</p><progress aria-label="Steps completed" value={completedCount} max={steps.length || 1} className="block h-2.5 w-full overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-[#E5E5E5] [&::-webkit-progress-value]:bg-[#91AE87] [&::-moz-progress-bar]:bg-[#91AE87]" /></div></div>
-          <ul className="mt-4 divide-y divide-dark-blue/10">{steps.map((text, index) => <li key={`${index}-${text}`}><label className="flex cursor-pointer items-start gap-3 py-3 text-sm"><input type="checkbox" checked={completed.includes(index)} onChange={() => onChange({ completedSteps: completed.includes(index) ? completed.filter((item) => item !== index) : [...completed, index] })} className="mt-0.5 accent-blue" /><span className={completed.includes(index) ? 'break-words text-gray line-through' : 'break-words'}>{text}</span></label></li>)}</ul>
+          <ul className="mt-4 divide-y divide-dark-blue/10">{steps.map((text, index) => {
+            // Editing or removing a step keeps the right steps ticked.
+            const replaceSteps = (next: string[]) => onChange({ steps: next, completedSteps: remapCompleted(steps, next, completed) })
+            if (editingStep?.index === index) return <li key={`${index}-${text}`} className="py-2"><form onSubmit={(event) => { event.preventDefault(); const value = editingStep.text.trim(); if (value) replaceSteps(steps.map((item, i) => i === index ? value : item)); setEditingStep(null) }} className="flex gap-2">
+              <input autoFocus aria-label={`Edit step ${index + 1}`} value={editingStep.text} maxLength={500} onChange={(event) => setEditingStep({ index, text: event.target.value })} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setEditingStep(null) } }} className={`${field} mt-0 flex-1`} />
+              <button className="min-h-11 shrink-0 rounded-lg bg-blue px-3 text-xs font-semibold text-white">Save</button>
+              <button type="button" onClick={() => setEditingStep(null)} className="min-h-11 shrink-0 rounded-lg px-2 text-xs text-link hover:bg-beige">Cancel</button>
+            </form></li>
+            return <li key={`${index}-${text}`} className="group flex items-start gap-1 py-1.5">
+              <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-1.5 text-sm"><input type="checkbox" checked={completed.includes(index)} onChange={() => onChange({ completedSteps: completed.includes(index) ? completed.filter((item) => item !== index) : [...completed, index] })} className="mt-0.5 accent-blue" /><span className={completed.includes(index) ? 'break-words text-gray line-through' : 'break-words'}>{text}</span></label>
+              <button type="button" onClick={() => setEditingStep({ index, text })} aria-label={`Edit step: ${text}`} title="Edit step" className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-gray hover:bg-beige hover:text-link focus-visible:outline-blue"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15v5Z" /></svg></button>
+              <button type="button" onClick={() => replaceSteps(steps.filter((_, i) => i !== index))} aria-label={`Remove step: ${text}`} title="Remove step" className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-gray hover:bg-light-red/50 hover:text-red focus-visible:outline-blue"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="h-3.5 w-3.5"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+            </li>
+          })}</ul>
           <form onSubmit={(event) => { event.preventDefault(); if (step.trim()) { onChange({ steps: [...steps, step.trim()] }); setStep('') } }} className="mt-2 flex gap-2"><input aria-label="New step" placeholder="Add a step…" value={step} onChange={(event) => setStep(event.target.value)} className={`${field} mt-0 flex-1`} /><button disabled={!step.trim()} className="shrink-0 rounded border border-dark-blue/15 px-2 text-xs text-link disabled:opacity-40">+ Add step</button></form>
         </section>
         <section className="py-4">

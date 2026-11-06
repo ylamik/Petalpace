@@ -1,7 +1,7 @@
 import sharp from 'sharp'
 import { deadlineInstant, validZone } from '../src/features/tasks/deadlineZone.ts'
 import { checkFileSignature } from './planner.mjs'
-import { emailLayout } from './reminders.mjs'
+import { emailLayout, escapeHtml, logoUrl, taskPanel } from './email-layout.mjs'
 /**
  * Collaboration endpoints — shared tasks that live outside the personal planner.
  *
@@ -96,7 +96,7 @@ export function createCollabHandler({ db, findSession, origins, limit, send, env
         from,
         to: [inviteeEmail],
         subject: `${inviterName} invited you to a shared task on Petalpace`,
-        html:emailLayout('You are invited', '<p>Someone invited you to a shared task. Sign in with the invited email to review and accept it.</p><p>This link expires in 7 days.</p>',link.href,'Review invitation'),
+        html:emailLayout('You’re invited to a shared task', `<p style="margin:0">${escapeHtml(inviterName)} would like you to work on this together in Petalpace.</p>${taskPanel(task.title,[['Invited by',inviterName],['Expires','In 7 days']],task.color)}<p style="margin:18px 0 0">Sign in with this email address to accept. You’ll need a Petalpace account.</p>`,link.href,'Review invitation',{preheader:`${inviterName} invited you to “${task.title}”`,footer:'If you weren’t expecting this, you can ignore it.',logo:logoUrl(env)}),
         text: `Hi,\n\n${inviterName} has invited you to collaborate on "${task.title}" in Petalpace.\n\nOpen this link to join:\n${link.href}\n\nThis invite expires in 7 days. You'll need a Petalpace account to accept it.\n\nIf you didn't expect this, you can ignore it.`,
       }),
       signal: AbortSignal.timeout(12000),

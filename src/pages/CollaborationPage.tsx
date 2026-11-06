@@ -157,7 +157,7 @@ function CreateTaskDialog({
               </select>
             </label>
             <label className="block text-sm font-medium">
-              Due date
+              Due date <span className="font-normal text-gray">(optional)</span>
               <input
                 type="date"
                 value={dueDate}

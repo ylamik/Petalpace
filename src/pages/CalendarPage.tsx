@@ -111,9 +111,9 @@ function WeekTask({
         aria-describedby={tooltip ? id : undefined}
         aria-label={`${task.title}. ${statusNames[status]}. ${deadlineText(task)}`}
         style={tint}
-        className={`block w-full min-w-0 cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-sm leading-snug focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue ${task.done ? "bg-done-card text-done-ink line-through" : "hover:brightness-95"}`}
+        className={`group block w-full min-w-0 cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-sm leading-snug focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue ${task.done ? "bg-done-card text-done-ink line-through" : "hover:brightness-95"}`}
       >
-        <span className="line-clamp-3 break-words">{task.title}</span>
+        <span className="line-clamp-3 break-words group-hover:underline">{task.title}</span>
         {task.dueTime && (
           <span className="mt-0.5 block text-xs text-gray">{timeOf(task)}</span>
         )}
@@ -202,7 +202,7 @@ export default function CalendarPage({
           type="button"
           onClick={() => setSelectedId(task.id)}
           aria-haspopup="dialog"
-          className="flex min-h-12 w-full min-w-0 cursor-pointer items-center gap-3 px-4 py-2 text-left hover:bg-nav-active/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue"
+          className="group flex min-h-12 w-full min-w-0 cursor-pointer items-center gap-3 px-4 py-2 text-left hover:bg-nav-active/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue"
         >
           <span
             aria-hidden="true"
@@ -211,7 +211,7 @@ export default function CalendarPage({
           />
           <span
             title={task.title}
-            className={`min-w-0 flex-1 truncate font-serif text-base ${task.done ? "text-gray line-through" : ""}`}
+            className={`min-w-0 flex-1 truncate font-serif text-base group-hover:underline ${task.done ? "text-gray line-through" : ""}`}
           >
             {task.title}
           </span>
