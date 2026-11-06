@@ -246,7 +246,7 @@ export default function HomePage() {
         {menuOpen && (
           <div
             id="mobile-menu"
-            className="border-t border-dark-blue/15 bg-beige md:hidden"
+            className="absolute inset-x-0 top-full border-y border-dark-blue/15 bg-beige shadow-lg md:hidden"
           >
             <nav
               aria-label="Mobile navigation"
@@ -294,11 +294,11 @@ export default function HomePage() {
                 id="hero-title"
                 className="font-sans leading-[1.05] tracking-tight"
               >
-                <span className="block text-[clamp(2.1rem,5vw,4.25rem)] font-bold">
+                <span className="block text-[clamp(3rem,11vw,4.25rem)] font-bold md:text-[clamp(2.1rem,5vw,4.25rem)]">
                   Small steps.
                 </span>
 
-                <span className="mt-2 block text-[clamp(1.9rem,4.6vw,3.875rem)] font-normal italic">
+                <span className="mt-2 block text-[clamp(2.6rem,9.5vw,3.875rem)] font-normal italic md:text-[clamp(1.9rem,4.6vw,3.875rem)]">
                   <span className="text-[#E98268]">Room</span> to bloom.
                 </span>
               </h1>
@@ -329,7 +329,7 @@ export default function HomePage() {
 
             {/* Book and handwritten note */}
             <motion.div
-              className="relative mx-auto w-[82%] max-w-[320px] pb-10 sm:w-[88%] sm:max-w-[390px] md:w-full md:max-w-[430px] lg:max-w-[500px] xl:max-w-[540px]"
+              className="relative right-[5%] mx-auto w-[82%] max-w-[320px] pb-10 md:right-0 sm:w-[88%] sm:max-w-[390px] md:w-full md:max-w-[430px] lg:max-w-[500px] xl:max-w-[540px]"
               initial={
                 reduceMotion
                   ? { opacity: 0 }
@@ -410,7 +410,7 @@ export default function HomePage() {
             {features.map((feature, index) => (
               <motion.article
                 key={feature.title}
-                className="paper-art relative isolate mx-auto w-full max-w-sm px-6 py-8 lg:px-8 lg:py-10"
+                className="paper-art relative isolate mx-auto w-full max-w-sm px-10 py-12 sm:px-12 lg:px-10 lg:py-12"
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 32 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ amount: 0.3 }}
@@ -479,7 +479,7 @@ export default function HomePage() {
             <ol className="mt-10 grid gap-10 md:grid-cols-2 md:gap-x-12 md:gap-y-12 lg:gap-x-20">
               {/* Step 1 */}
               <motion.li
-                className="flex min-w-0 items-start gap-3 sm:gap-4"
+                className="flex min-w-0 flex-col items-center gap-3 text-center md:flex-row md:items-start md:gap-4 md:text-left"
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 28 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ amount: 0.4 }}
@@ -500,13 +500,13 @@ export default function HomePage() {
                     src="/images/add-a-task.png"
                     alt=""
                     aria-hidden="true"
-                    className="mt-5 h-auto rounded w-full max-w-[340px] object-contain"
+                    className="mx-auto mt-5 h-auto rounded w-full max-w-[340px] object-contain md:mx-0"
                   />                </div>
               </motion.li>
 
               {/* Step 2 */}
               <motion.li
-                className="flex min-w-0 items-start gap-3 sm:gap-4"
+                className="flex min-w-0 flex-col items-center gap-3 text-center md:flex-row md:items-start md:gap-4 md:text-left"
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 28 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ amount: 0.4 }}
@@ -531,14 +531,14 @@ export default function HomePage() {
                     src="/images/break-it-down.png"
                     alt=""
                     aria-hidden="true"
-                    className="mt-5 h-auto w-full max-w-[340px] rounded object-contain"
+                    className="mx-auto mt-5 h-auto w-full max-w-[340px] rounded object-contain md:mx-0"
                   />
                 </div>
               </motion.li>
 
               {/* Step 3 */}
               <motion.li
-                className="flex min-w-0 items-start gap-3 sm:gap-4"
+                className="flex min-w-0 flex-col items-center gap-3 text-center md:flex-row md:items-start md:gap-4 md:text-left"
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 28 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ amount: 0.4 }}
@@ -563,14 +563,14 @@ export default function HomePage() {
                     src="/images/choose-your-focus.png"
                     alt=""
                     aria-hidden="true"
-                    className="mt-5 h-auto w-full max-w-[340px] rounded object-contain"
+                    className="mx-auto mt-5 h-auto w-full max-w-[340px] rounded object-contain md:mx-0"
                   />                
                 </div>
               </motion.li>
 
               {/* Step 4 */}
               <motion.li
-                className="flex min-w-0 items-start gap-3 sm:gap-4"
+                className="flex min-w-0 flex-col items-center gap-3 text-center md:flex-row md:items-start md:gap-4 md:text-left"
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 28 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ amount: 0.4 }}
@@ -597,7 +597,7 @@ export default function HomePage() {
                     src="/images/celebrate-your-progress.png"
                     alt=""
                     aria-hidden="true"
-                    className="mt-5 h-auto w-full max-w-[340px] rounded object-contain"
+                    className="mx-auto mt-5 h-auto w-full max-w-[340px] rounded object-contain md:mx-0"
                   />     
                 </div>
               </motion.li>

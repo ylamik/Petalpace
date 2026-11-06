@@ -18,6 +18,15 @@ import { randomBytes, createHash } from 'node:crypto'
 import { notifyPlannerChanged } from './sse-broker.mjs'
 import { emailReady, mailSender } from './mailer.mjs'
 
+// Delegated-task status. `done` stays the source of truth for completion;
+// status adds To do / In progress / Blocked for items that aren't done.
+const stepStatuses = ['todo', 'progress', 'done', 'blocked']
+function stepStatus(step, old) {
+  if (step.done) return 'done'
+  if (stepStatuses.includes(step.status) && step.status !== 'done') return step.status
+  return old && old.status && old.status !== 'done' && !old.done ? old.status : 'todo'
+}
+
 const digest = v => createHash('sha256').update(v).digest('hex')
 const text = (s, n) => typeof s === 'string' && s.length <= n
 const validUrl = s => { try { return ['http:', 'https:'].includes(new URL(s).protocol) } catch { return false } }
@@ -53,7 +62,7 @@ function taskView(db, task) {
       photoUrl: null,
     })),
     subtasks: subtasks.map(s => ({
-      id: s.id, title: s.title, done: !!s.done,
+      id: s.id, title: s.title, done: !!s.done, status: s.done ? 'done' : (s.status==='done' ? 'todo' : s.status || 'todo'),
       assignedTo: s.assigned_to, position: s.position, notes:s.notes, links:JSON.parse(s.links),
     })),
     files: files.map(f => ({ id: f.id, name: f.name, type: f.type, lastModified: f.last_modified, subtaskId:f.subtask_id })),
@@ -192,7 +201,7 @@ export function createCollabHandler({ db, findSession, origins, limit, send, env
         if(freshMember.role!=='steps' && freshMember.role!=='member')return reply(res,403,{error:'You have view-only access.'})
         if(Object.keys(data).some(k=>!['revision','subtasks'].includes(k)))return reply(res,403,{error:'You can only update your assigned steps.'})
         const oldSteps=db.prepare('SELECT * FROM collab_subtasks WHERE task_id=? ORDER BY position').all(task.id)
-        if(!Array.isArray(data.subtasks) || data.subtasks.length!==oldSteps.length || data.subtasks.some((step,i)=>{const old=oldSteps[i];return !step || step.id!==old.id || step.title!==old.title || (step.assignedTo || null)!==old.assigned_to || (old.assigned_to!==user.id && ((step.notes ?? old.notes)!==old.notes || JSON.stringify(step.links ?? JSON.parse(old.links))!==old.links || Boolean(step.done)!==Boolean(old.done)))}))return reply(res,403,{error:'You can only update the notes, links and completion of your assigned steps.'})
+        if(!Array.isArray(data.subtasks) || data.subtasks.length!==oldSteps.length || data.subtasks.some((step,i)=>{const old=oldSteps[i];return !step || step.id!==old.id || step.title!==old.title || (step.assignedTo || null)!==old.assigned_to || (old.assigned_to!==user.id && ((step.notes ?? old.notes)!==old.notes || JSON.stringify(step.links ?? JSON.parse(old.links))!==old.links || Boolean(step.done)!==Boolean(old.done) || stepStatus(step,old)!==stepStatus(old,old)))}))return reply(res,403,{error:'You can only update the notes, links and completion of your assigned steps.'})
       }
       if(data.assignedTo!==undefined && data.assignedTo!==null && typeof data.assignedTo!=='string')return reply(res,400,{error:'Choose a member to assign.'})
       if(data.assignedTo && !db.prepare('SELECT 1 FROM collab_members WHERE task_id=? AND user_id=?').get(task.id,data.assignedTo))return reply(res,400,{error:'Assign this task to a member.'})
@@ -267,7 +276,7 @@ export function createCollabHandler({ db, findSession, origins, limit, send, env
           if (!s || !text(s.title, 500) || !s.title.trim()) return reply(res, 400, { error: 'Each subtask needs a title up to 500 characters.' })
           if(s.notes!==undefined && !text(s.notes,20000))return reply(res,400,{error:'Delegated notes must be 20,000 characters or fewer.'})
           if(s.links!==undefined && (!Array.isArray(s.links) || s.links.length>50 || s.links.some(url=>!text(url,2048) || !validUrl(url))))return reply(res,400,{error:'Use up to 50 valid http/https links per delegated task.'})
-          if(typeof s.done!=='boolean')return reply(res,400,{error:'Invalid step status.'})
+          if(typeof s.done!=='boolean' || (s.status!==undefined && !stepStatuses.includes(s.status)))return reply(res,400,{error:'Invalid step status.'})
           if(s.assignedTo!==undefined && s.assignedTo!==null && typeof s.assignedTo!=='string')return reply(res,400,{error:'Choose a member for this step.'})
           if(s.assignedTo && !db.prepare('SELECT 1 FROM collab_members WHERE task_id=? AND user_id=?').get(task.id,s.assignedTo))return reply(res,400,{error:'Assign steps only to task members.'})
           if (s.assignedTo !== undefined && s.assignedTo !== null && typeof s.assignedTo !== 'string') return reply(res, 400, { error: 'Invalid assignee.' })
@@ -308,7 +317,8 @@ export function createCollabHandler({ db, findSession, origins, limit, send, env
           }
         }
         if (data.subtasks !== undefined) {
-          const existing = db.prepare('SELECT id FROM collab_subtasks WHERE task_id = ?').all(task.id).map(r => r.id)
+          const oldRows = db.prepare('SELECT * FROM collab_subtasks WHERE task_id = ?').all(task.id)
+          const existing = oldRows.map(r => r.id)
           const incoming = data.subtasks.map(s => s.id).filter(Boolean)
           for (const id of existing.filter(id => !incoming.includes(id))) {
             db.prepare('DELETE FROM collab_files WHERE subtask_id=? AND task_id=?').run(id,task.id)
@@ -316,9 +326,9 @@ export function createCollabHandler({ db, findSession, origins, limit, send, env
           }
           data.subtasks.forEach((s, pos) => {
             if (s.id && existing.includes(s.id)) {
-              db.prepare('UPDATE collab_subtasks SET title = ?, done = ?, assigned_to = ?, position = ?, notes=COALESCE(?,notes), links=COALESCE(?,links) WHERE id = ? AND task_id = ?').run(s.title.trim(), s.done ? 1 : 0, s.assignedTo || null, pos, s.notes ?? null, s.links===undefined?null:JSON.stringify(s.links), s.id, task.id)
+              db.prepare('UPDATE collab_subtasks SET title = ?, done = ?, status = ?, assigned_to = ?, position = ?, notes=COALESCE(?,notes), links=COALESCE(?,links) WHERE id = ? AND task_id = ?').run(s.title.trim(), s.done ? 1 : 0, stepStatus(s, oldRows.find(r => r.id === s.id)), s.assignedTo || null, pos, s.notes ?? null, s.links===undefined?null:JSON.stringify(s.links), s.id, task.id)
             } else {
-              db.prepare('INSERT INTO collab_subtasks (id, task_id, title, done, assigned_to, position, notes, links) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(randomBytes(8).toString('hex'), task.id, s.title.trim(), s.done ? 1 : 0, s.assignedTo || null, pos, s.notes || '', JSON.stringify(s.links || []))
+              db.prepare('INSERT INTO collab_subtasks (id, task_id, title, done, status, assigned_to, position, notes, links) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(randomBytes(8).toString('hex'), task.id, s.title.trim(), s.done ? 1 : 0, stepStatus(s), s.assignedTo || null, pos, s.notes || '', JSON.stringify(s.links || []))
             }
           })
         }

@@ -206,7 +206,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
                   autoComplete="email"
                   autoCapitalize="none"
                   spellCheck={false}
-                  placeholder="you@example.com"
+                  placeholder="Enter email"
                   required
                   maxLength={254}
                   className={inputClass}
@@ -229,6 +229,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
                     autoComplete={
                       newPassword ? 'new-password' : 'current-password'
                     }
+                    placeholder="Enter password"
                     required
                     minLength={newPassword ? 15 : undefined}
                     maxLength={128}
@@ -284,7 +285,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
               {newPassword && <div>
                 <label htmlFor="auth-confirm" className="block text-sm font-semibold">Confirm password</label>
                 <div className="relative">
-                  <input id="auth-confirm" name="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} autoComplete="new-password" required maxLength={128} className={`${inputClass} pr-12`} />
+                  <input id="auth-confirm" name="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} autoComplete="new-password" placeholder="Enter password again" required maxLength={128} className={`${inputClass} pr-12`} />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(visible => !visible)}

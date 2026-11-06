@@ -263,7 +263,21 @@ export default function CollaborationPage() {
     <div className="text-dark-blue">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold sm:text-[34px]">Shared</h1>
+          <div className="relative isolate inline-block pr-10">
+            <h1 className="relative text-3xl font-bold sm:text-[34px]">Shared</h1>
+            <img
+              src="/images/yellow-doodle.png"
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-2 -top-5 h-10 w-14 object-contain"
+            />
+            <img
+              src="/images/yellow-line.png"
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-1 left-0 -z-10 h-3 w-24 object-fill"
+            />
+          </div>
           <p className="mt-0.5 font-serif text-lg text-gray">
             Shared tasks between you and your team
           </p>

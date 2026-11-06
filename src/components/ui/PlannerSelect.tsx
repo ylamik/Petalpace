@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-export type SelectChoice={value:string;label:string;color?:string}
+export type SelectChoice={value:string;label:string;color?:string;description?:string}
 type SelectTone = 'neutral' | 'todo' | 'progress' | 'done' | 'blocked'
 const tones: Record<SelectTone, string> = {
   neutral: 'border border-dark-blue/20 bg-surface text-dark-blue',
@@ -19,7 +19,7 @@ export default function PlannerSelect({value,onChange,options,label,className=''
   const [position,setPosition]=useState({left:0,top:0,width:220,maxHeight:280})
   const trigger=useRef<HTMLButtonElement>(null),menu=useRef<HTMLDivElement>(null),id=useId()
   const selected=options.find(o=>o.value===value)
-  function show(){const rect=trigger.current?.getBoundingClientRect();if(!rect)return;const width=Math.min(Math.max(rect.width,220),window.innerWidth-24);const below=window.innerHeight-rect.bottom-12;const height=Math.min(280,options.length*44+16);setPosition({left:Math.max(12,Math.min(rect.left,window.innerWidth-width-12)),top:below<height && rect.top>height?rect.top-height-6:rect.bottom+6,width,maxHeight:Math.max(100,below<height && rect.top>height?height:below)});setActive(Math.max(0,options.findIndex(o=>o.value===value)));setOpen(true)}
+  function show(){const rect=trigger.current?.getBoundingClientRect();if(!rect)return;const width=Math.min(Math.max(rect.width,220),window.innerWidth-24);const below=window.innerHeight-rect.bottom-12;const height=Math.min(320,options.length*(options.some(o=>o.description)?64:44)+16);setPosition({left:Math.max(12,Math.min(rect.left,window.innerWidth-width-12)),top:below<height && rect.top>height?rect.top-height-6:rect.bottom+6,width,maxHeight:Math.max(100,below<height && rect.top>height?height:below)});setActive(Math.max(0,options.findIndex(o=>o.value===value)));setOpen(true)}
   function close(){setOpen(false);trigger.current?.focus()}
   function choose(index:number){const option=options[index];if(option){onChange(option.value);close()}}
   useEffect(()=>{
@@ -47,7 +47,7 @@ export default function PlannerSelect({value,onChange,options,label,className=''
     }}>
       {options.map((option,index)=><div key={option.value} id={`${id}-${index}`} role="option" aria-selected={value===option.value} onMouseEnter={()=>setActive(index)} onClick={()=>choose(index)} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 ${textSize} ${index===active?'bg-beige':value===option.value?'bg-beige/40':''}`}>
         {priorityIcons && <PriorityFlag value={option.value}/>}
-        {option.color && <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-dark-blue/20" style={{backgroundColor:option.color}}/>}<span className="min-w-0 flex-1 break-words">{option.label}</span>{value===option.value && <span aria-hidden="true" className="text-link">✓</span>}
+        {option.color && <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-dark-blue/20" style={{backgroundColor:option.color}}/>}<span className="min-w-0 flex-1 break-words">{option.label}{option.description && <span className="mt-0.5 block text-xs leading-snug text-gray">{option.description}</span>}</span>{value===option.value && <span aria-hidden="true" className="text-link">✓</span>}
       </div>)}
     </div>}
   </>

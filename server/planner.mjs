@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { deadlineInstant, validZone, taskIdentity } from '../src/features/tasks/deadlineZone.ts'
 import { isOfficePackage } from './document-format.mjs'
 import { notifyPlannerChanged } from './sse-broker.mjs'
-const defaults = [{id:'school',name:'School',color:'#D7E7FD'},{id:'personal',name:'Personal',color:'#FDDCCD'},{id:'creative',name:'Creative',color:'#D6DDC9'}]
+const defaults = [{id:'school',name:'School',color:'#D7E7FD'},{id:'personal',name:'Personal',color:'#FDDCCD'}]
 const fail = message => { throw Object.assign(new Error(message),{status:400}) }
 const text = (s,n) => typeof s==='string' && [...s].length<=n
 const dateOK = s => { try { return s==='' || (/^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(s+'T12:00:00Z').toISOString().slice(0,10)===s) } catch { return false } }

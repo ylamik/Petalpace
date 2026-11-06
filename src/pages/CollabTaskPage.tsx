@@ -9,6 +9,7 @@ import FileTypeIcon from '../components/ui/FileTypeIcon'
 import { useAuth } from '../features/auth/auth'
 import ConfirmTaskDialog from '../features/tasks/components/ConfirmTaskDialog'
 import { usePlannerSync } from '../hooks/usePlannerSync'
+import PlannerSelect from '../components/ui/PlannerSelect'
 
 const statusOptions = [
   { value: 'todo', label: 'To do', color: 'bg-light-gray/60 text-gray' },
@@ -16,6 +17,17 @@ const statusOptions = [
   { value: 'done', label: 'Done', color: 'bg-light-green text-done-ink' },
   { value: 'blocked', label: 'Blocked', color: 'bg-light-orange text-orange' },
 ]
+type StepStatus = NonNullable<CollabSubtask['status']>
+const stepStatusChoices = statusOptions.map(({ value, label }) => ({ value, label }))
+const stepTone = (s: CollabSubtask): StepStatus => s.done ? 'done' : s.status && s.status !== 'done' ? s.status : 'todo'
+const permissionOptions = [
+  { value: 'editor', label: 'Edit all content', description: 'Change anything in this task, even items not assigned to them.' },
+  { value: 'steps', label: 'Assigned items only', description: 'Update the status, notes and links of items assigned to them.' },
+  { value: 'viewer', label: 'View only', description: 'Read and download. No changes.' },
+]
+const permissionLabel = (role: string) => permissionOptions.find(o => o.value === (role === 'member' ? 'steps' : role))?.label ?? role
+type InviteRow = { key: number; email: string; permission: string }
+const TrashIcon = () => <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
 
 function MemberBadge({ member }: { member: CollabTask['members'][number] }) {
   return (
@@ -28,7 +40,7 @@ function MemberBadge({ member }: { member: CollabTask['members'][number] }) {
         <p className="truncate text-xs text-gray">{member.email}</p>
       </div>
       <span className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs ${member.role === 'owner' ? 'bg-lightest-blue text-dark-blue' : 'bg-light-gray/60 text-gray'}`}>
-        {member.role === 'owner' ? 'Owner' : member.role === 'editor' ? 'Editor' : member.role === 'viewer' ? 'View only' : 'Limited: assigned steps'}
+        {member.role === 'owner' ? 'Owner' : permissionLabel(member.role)}
       </span>
     </div>
   )
@@ -42,16 +54,17 @@ export default function CollabTaskPage() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const [invitePermission,setInvitePermission]=useState('steps')
   const [syncing,setSyncing]=useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteMsg, setInviteMsg] = useState('')
+  const [invites, setInvites] = useState<InviteRow[]>([{ key: 0, email: '', permission: 'steps' }])
+  const [inviteMsg, setInviteMsg] = useState<string[]>([])
   const [inviteBusy, setInviteBusy] = useState(false)
   const [pendingStatus,setPendingStatus]=useState<CollabTask['status'] | null>(null)
   const [memberToRemove,setMemberToRemove]=useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [stepToRemove,setStepToRemove]=useState<CollabSubtask | null>(null)
+  const [pendingStep,setPendingStep]=useState<{step:CollabSubtask;status:StepStatus} | null>(null)
+  const [detailsOpen,setDetailsOpen]=useState(false)
   const [newSubtask, setNewSubtask] = useState('')
 
   const isOwner = task?.ownerId === user?.id
@@ -91,9 +104,9 @@ export default function CollabTaskPage() {
     if(await save({ subtasks }))setNewSubtask('')
   }
 
-  async function toggleSubtask(s: CollabSubtask) {
+  async function setStepStatus(s: CollabSubtask, status: StepStatus) {
     if (!task) return
-    await save({ subtasks: task.subtasks.map(item => item.id === s.id ? { ...item, done: !item.done } : item) })
+    await save({ subtasks: task.subtasks.map(item => item.id === s.id ? { ...item, status, done: status === 'done' } : item) })
   }
 
   async function removeSubtask(s: CollabSubtask) {
@@ -140,15 +153,26 @@ export default function CollabTaskPage() {
     await save({files:remaining.map(f=>({...f,data:''}))})
   }
 
-  async function sendInvite() {
-    if (!task || !inviteEmail.trim()) return
-    setInviteBusy(true); setInviteMsg('')
-    try {
-      const { message } = await collabApi.invite(task.id, inviteEmail.trim(),invitePermission)
-      setInviteMsg(message); setInviteEmail('')
-    } catch (e) { setInviteMsg(e instanceof Error ? e.message : 'Could not send invite.') }
-    finally { setInviteBusy(false) }
+  // Send every filled-in row; keep the ones that failed so they can be fixed and retried.
+  async function sendInvites() {
+    const rows = invites.filter(r => r.email.trim())
+    if (!task || !rows.length) return
+    setInviteBusy(true); setInviteMsg([])
+    const messages: string[] = [], failed: InviteRow[] = []
+    for (const row of rows) {
+      try {
+        const { message } = await collabApi.invite(task.id, row.email.trim(), row.permission)
+        messages.push(`${row.email.trim()}: ${message}`)
+      } catch (e) {
+        messages.push(`${row.email.trim()}: ${e instanceof Error ? e.message : 'Could not send invite.'}`)
+        failed.push(row)
+      }
+    }
+    setInviteMsg(messages)
+    setInvites(failed.length ? failed : [{ key: Date.now(), email: '', permission: 'steps' }])
+    setInviteBusy(false)
   }
+  const updateInvite = (key: number, change: Partial<InviteRow>) => setInvites(rows => rows.map(r => r.key === key ? { ...r, ...change } : r))
 
   async function removeMember(userId: string) {
     if (!task) return
@@ -199,17 +223,18 @@ export default function CollabTaskPage() {
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={()=>{navigator.clipboard.writeText(window.location.href).then(()=>setSaveError('Task link copied. Only invited members can open it.')).catch(()=>setSaveError('Copy the page address to share with existing members.'))}} className="min-h-10 rounded-lg border border-blue/30 px-3 text-sm text-link">Copy task link</button>
             {/* Status selector — all members can change */}
-            <div className="relative">
-              <select
-                disabled={!canEdit || saving}
+            {canEdit && !saving ? (
+              <PlannerSelect
+                label="Task status"
                 value={task.status}
-                onChange={e => {const next=e.target.value as CollabTask['status'];if(next!==task.status && (next==='done' || task.status==='done'))setPendingStatus(next);else void save({status:next})}}
-                aria-label="Task status"
-                className={`min-h-10 cursor-pointer rounded-full border-0 px-3 py-1.5 text-sm font-medium ${currentStatus.color} focus-visible:outline-blue`}
-              >
-                {statusOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
+                tone={task.status}
+                className="min-h-10 rounded-full"
+                options={stepStatusChoices}
+                onChange={value => {const next=value as CollabTask['status'];if(next!==task.status && (next==='done' || task.status==='done'))setPendingStatus(next);else void save({status:next})}}
+              />
+            ) : (
+              <span className={`rounded-full px-3 py-1.5 text-sm font-medium ${currentStatus.color}`}>{currentStatus.label}</span>
+            )}
             <span className={`rounded-full px-3 py-1.5 text-sm ${task.priority === 'High' ? 'bg-light-red text-red' : task.priority === 'Medium' ? 'bg-light-orange text-orange' : 'bg-light-gray text-gray'}`}>
               ⚑ {task.priority}
             </span>
@@ -222,13 +247,20 @@ export default function CollabTaskPage() {
         {saveError && <div role="alert" className="mt-3 text-sm text-red">{saveError}<button onClick={()=>window.location.reload()} className="ml-2 text-link underline">Reload shared task</button></div>}
       </header>
 
-      {canEdit && <section className="mt-4 rounded-xl border border-dark-blue/15 bg-surface p-5"><h2 className="mb-3 font-semibold">Edit task details</h2><SharedDetails canChangeZone={isOwner} key={task.id} task={task} save={save}/></section>}
+      {canEdit && <section className="mt-4 rounded-xl border border-dark-blue/15 bg-surface">
+        <h2>
+          <button type="button" aria-expanded={detailsOpen} aria-controls="shared-details" onClick={() => setDetailsOpen(open => !open)} className="flex w-full items-center justify-between gap-3 rounded-xl px-5 py-4 text-left font-semibold hover:bg-beige/40 focus-visible:outline-2 focus-visible:outline-blue">
+            <span>Edit task details <span className="ml-1 text-sm font-normal text-gray">Title, due date, priority, timezone</span></span>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-5 w-5 shrink-0 transition-transform ${detailsOpen ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </h2>
+        {detailsOpen && <div id="shared-details" className="border-t border-dark-blue/10 px-5 pb-5 pt-4"><SharedDetails canChangeZone={isOwner} key={task.id} task={task} save={save}/></div>}
+      </section>}
       <section className="mt-4 rounded-xl border border-dark-blue/15 bg-surface p-5">
         <h2 className="font-bold">Group resources</h2>
         <p className="mb-3 mt-1 text-sm text-gray">Files and links for the whole group. Resources for a delegated task belong inside that task below.</p>
         {resources()}
-      </section>
-      {canEdit && <label className="mt-4 block text-sm">Task assignee<select value={task.assignedTo || ''} disabled={saving} onChange={e=>void save({assignedTo:e.target.value || null})} className="ml-2 min-h-10 max-w-full rounded border border-dark-blue/20 bg-surface px-3"><option value="">Unassigned</option>{task.members.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
+      </section>
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
         {/* Main column */}
         <div className="space-y-5">
@@ -244,6 +276,9 @@ export default function CollabTaskPage() {
               <h2 className="font-bold">Delegated tasks</h2>
               <span className="text-xs text-gray">{completedCount}/{task.subtasks.length} done</span>
             </div>
+            <div className="mb-3 -mt-2 flex flex-wrap gap-1.5">
+              {task.subtasks.length > 0 && statusOptions.map(o => {const count=task.subtasks.filter(s=>stepTone(s)===o.value).length;return count ? <span key={o.value} className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${o.color}`}>{count} {o.label.toLowerCase()}</span> : null})}
+            </div>
             {task.subtasks.length > 0 && (
               <div className="mb-1 h-2 overflow-hidden rounded-full bg-light-gray/50">
                 <div className="h-full rounded-full bg-[#91AE87] transition-all" style={{ width: `${task.subtasks.length ? (completedCount / task.subtasks.length) * 100 : 0}%` }} />
@@ -252,26 +287,26 @@ export default function CollabTaskPage() {
             <p className="mt-3 text-sm text-gray">Divide the work and assign each item to a member. Open an item’s notes and resources below.</p>
             <ul className="mt-4 space-y-3">
               {task.subtasks.map(s => (
-                <li key={s.id} className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-dark-blue/15 bg-beige/20 p-3">
-                  <input
-                    type="checkbox"
-                    disabled={saving || (!canEdit && (!['member','steps'].includes(currentRole || '') || s.assignedTo!==user?.id))}
-                    checked={s.done}
-                    onChange={() => toggleSubtask(s)}
-                    aria-label={s.title}
-                    className="h-4 w-4 accent-blue"
-                  />
-                  <span className={`min-w-0 flex-1 break-words text-sm ${s.done ? 'text-gray line-through' : ''}`}>{s.title}</span>
-                  {canEdit && <select aria-label={`Assign ${s.title}`} value={s.assignedTo || ''} disabled={saving} onChange={e=>void save({subtasks:task.subtasks.map(step=>step.id===s.id?{...step,assignedTo:e.target.value || null}:step)})} className="max-w-36 min-h-10 rounded border border-dark-blue/20 bg-surface px-2 text-sm"><option value="">Unassigned</option>{task.members.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>}
-                  {s.assignedTo && !canEdit && (
+                <li key={s.id} className="min-w-0 rounded-xl border border-dark-blue/15 bg-beige/20 p-3">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-3">
+                  <span className={`min-w-0 basis-full break-words text-sm font-medium sm:flex-1 sm:basis-auto ${s.done ? 'text-gray line-through' : ''}`}>{s.title}</span>
+                  {canEdit || ownsStep(s) ? (
+                    <PlannerSelect label={`Status for ${s.title}`} value={stepTone(s)} tone={stepTone(s)} className="min-h-10 w-36 shrink-0" options={stepStatusChoices} onChange={value => {const next=value as StepStatus;if(saving || next===stepTone(s))return;setPendingStep({step:s,status:next})}} />
+                  ) : (
+                    <span className={`inline-flex min-h-10 w-36 shrink-0 items-center rounded-lg px-3 text-sm font-medium ${statusOptions.find(o => o.value === stepTone(s))?.color}`}>{statusOptions.find(o => o.value === stepTone(s))?.label}</span>
+                  )}
+                  {canEdit ? (
+                    <PlannerSelect label={`Assign ${s.title}`} value={s.assignedTo || ''} className="min-h-10 w-40 shrink-0" options={[{value:'',label:'Unassigned'},...task.members.map(m=>({value:m.id,label:m.name}))]} onChange={value=>{if(!saving)void save({subtasks:task.subtasks.map(step=>step.id===s.id?{...step,assignedTo:value || null}:step)})}} />
+                  ) : (
                     <span className="shrink-0 text-xs text-gray">
-                      {task.members.find(m => m.id === s.assignedTo)?.name ?? ''}
+                      {s.assignedTo ? task.members.find(m => m.id === s.assignedTo)?.name ?? '' : 'Unassigned'}
                     </span>
                   )}
                   {canEdit && (
-                    <button type="button" onClick={() => removeSubtask(s)} aria-label={`Remove delegated task: ${s.title}`} className="shrink-0 rounded px-2 text-xs text-red hover:bg-light-red/30">Remove</button>
+                    <button type="button" onClick={() => removeSubtask(s)} aria-label={`Remove delegated task: ${s.title}`} title="Remove" className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray hover:bg-light-red/30 hover:text-red sm:ml-0"><TrashIcon /></button>
                   )}
-                  <details className="w-full min-w-0 border-t border-dark-blue/10 pt-3">
+                  </div>
+                  <details className="mt-3 w-full min-w-0 border-t border-dark-blue/10 pt-3">
                     <summary className="cursor-pointer text-sm font-medium text-link">Notes &amp; resources ({task.files.filter(f=>f.subtaskId===s.id).length+(s.links?.length || 0)})</summary>
                     <div className="mt-3 space-y-4">
                       {canEdit && <NoteEditor singleLine value={s.title} revision={task.revision} onSave={(title,revision)=>save({revision,subtasks:task.subtasks.map(item=>item.id===s.id?{...item,title}:item)})}/>}
@@ -305,7 +340,7 @@ export default function CollabTaskPage() {
               {task.members.map(m => (
                 <div key={m.id} className="group flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <MemberBadge member={m} />{isOwner && m.role!=='owner' && <select aria-label={`Permission for ${m.name}`} value={m.role==='member'?'steps':m.role} onChange={e=>{void collabApi.permission(task.id,m.id,e.target.value).then(r=>setTask(r.task)).catch(e=>setSaveError(e.message))}} className="mt-1 min-h-10 w-full rounded border border-dark-blue/20 bg-surface px-2 text-sm"><option value="editor">Edit all content</option><option value="steps">Assigned status only</option><option value="viewer">View only</option></select>}
+                    <MemberBadge member={m} />{isOwner && m.role!=='owner' && <PlannerSelect label={`Permission for ${m.name}`} value={m.role==='member'?'steps':m.role} className="mt-1 min-h-10 w-full" options={permissionOptions} onChange={value=>{void collabApi.permission(task.id,m.id,value).then(r=>setTask(r.task)).catch(e=>setSaveError(e.message))}}/>}
                   </div>
                   {isOwner && m.role !== 'owner' && (
                     <button type="button" onClick={() => setMemberToRemove(m.id)} aria-label={`Remove ${m.name}`} className="shrink-0 rounded px-1.5 text-xs text-red opacity-0 group-hover:opacity-100 hover:bg-light-red/30 focus-visible:opacity-100">Remove</button>
@@ -316,22 +351,37 @@ export default function CollabTaskPage() {
 
             {isOwner && (
               <div className="mt-4 border-t border-dark-blue/10 pt-4">
-                <p className="mb-2 text-sm font-medium">Invite by email</p><label className="block text-sm">Permission<select value={invitePermission} onChange={e=>setInvitePermission(e.target.value)} className="my-2 min-h-11 w-full rounded-lg border border-dark-blue/20 bg-surface px-2"><option value="steps">Assigned status only</option><option value="editor">Edit all content</option><option value="viewer">View only</option></select></label><p className="mb-3 text-xs text-gray">Edit all content: change any task, notes, assignments, files and links—even when not assigned. Assigned status only: mark only their assigned items done or not done. View only: read and download. Only the owner manages members.</p>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={e => setInviteEmail(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void sendInvite() } }}
-                    placeholder="colleague@example.com"
-                    className="min-h-10 min-w-0 flex-1 rounded-lg border border-dark-blue/20 bg-surface px-3 text-sm focus-visible:outline-blue"
-                  />
-                  <button type="button" onClick={() => void sendInvite()} disabled={inviteBusy || !inviteEmail.trim()} className="min-h-10 rounded-lg bg-blue px-3 text-sm text-white disabled:opacity-60">
-                    {inviteBusy ? '…' : 'Invite'}
+                <p className="text-sm font-semibold">Invite people</p>
+                <p className="mb-3 mt-0.5 text-xs text-gray">Add as many people as you need and choose what each person can do.</p>
+                <div className="space-y-3">
+                  {invites.map((row, index) => (
+                    <div key={row.key} className="rounded-xl border border-dark-blue/15 bg-beige/20 p-2.5">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="email"
+                          value={row.email}
+                          onChange={e => updateInvite(row.key, { email: e.target.value })}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void sendInvites() } }}
+                          placeholder="Enter email"
+                          aria-label={`Email for person ${index + 1}`}
+                          className="min-h-10 min-w-0 flex-1 rounded-lg border border-dark-blue/20 bg-surface px-3 text-sm focus-visible:outline-blue"
+                        />
+                        {invites.length > 1 && (
+                          <button type="button" onClick={() => setInvites(rows => rows.filter(r => r.key !== row.key))} aria-label={`Remove person ${index + 1}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray hover:bg-light-red/30 hover:text-red"><TrashIcon /></button>
+                        )}
+                      </div>
+                      <PlannerSelect label={`Permission for person ${index + 1}`} value={row.permission} className="mt-2 min-h-10 w-full" options={permissionOptions} onChange={permission => updateInvite(row.key, { permission })} />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => setInvites(rows => [...rows, { key: Date.now(), email: '', permission: rows.at(-1)?.permission ?? 'steps' }])} disabled={invites.length >= 10} className="min-h-10 rounded-lg border border-dark-blue/15 px-3 text-sm text-link hover:bg-beige/60 disabled:opacity-40">+ Add another</button>
+                  <button type="button" onClick={() => void sendInvites()} disabled={inviteBusy || !invites.some(r => r.email.trim())} className="ml-auto inline-flex min-h-10 items-center gap-2 rounded-lg bg-blue px-4 text-sm font-semibold text-white hover:bg-action-hover disabled:opacity-60">
+                    {inviteBusy && <ButtonSpinner />}{inviteBusy ? 'Sending…' : invites.filter(r => r.email.trim()).length > 1 ? `Send ${invites.filter(r => r.email.trim()).length} invites` : 'Send invite'}
                   </button>
                 </div>
-                {inviteMsg && <p role="status" className="mt-2 text-xs text-gray">{inviteMsg}</p>}
-                <p className="mt-2 text-xs text-gray">They'll receive an email with a link to join. They'll need a Petalpace account.</p>
+                {inviteMsg.length > 0 && <ul role="status" className="mt-2 space-y-1 text-xs text-gray">{inviteMsg.map(m => <li key={m} className="break-words">{m}</li>)}</ul>}
+                <p className="mt-2 text-xs text-gray">Each person gets an email with a link to join. They need a Petalpace account. Only you can manage members.</p>
               </div>
             )}
           </section>
@@ -351,6 +401,19 @@ export default function CollabTaskPage() {
         </aside>
       </div>
 
+      {pendingStep && (() => {
+        const from = stepTone(pendingStep.step), to = pendingStep.status
+        const label = (v: string) => statusOptions.find(o => o.value === v)?.label ?? v
+        return <ConfirmTaskDialog
+          title={to === 'done' ? 'Mark this item as done?' : from === 'done' ? 'Reopen this item?' : `Change status to ${label(to)}?`}
+          message={`“${pendingStep.step.title}” will move from ${label(from)} to ${label(to)}. Every member will see this change.`}
+          confirmLabel={to === 'done' ? 'Mark as done' : from === 'done' ? 'Reopen item' : 'Change status'}
+          cancelLabel="Cancel"
+          destructive={false}
+          onCancel={() => setPendingStep(null)}
+          onConfirm={() => { const { step, status } = pendingStep; setPendingStep(null); void setStepStatus(step, status) }}
+        />
+      })()}
       {stepToRemove && <ConfirmTaskDialog title="Remove delegated task?" message="This removes this item and its notes, links and attached files for every member." confirmLabel="Remove item" onCancel={()=>setStepToRemove(null)} onConfirm={async()=>{if(await save({subtasks:task.subtasks.filter(s=>s.id!==stepToRemove.id)}))setStepToRemove(null)}}/>}
       {memberToRemove && <ConfirmTaskDialog title="Remove this member?" message="Their access will end and their assignments will become unassigned. Their work stays in the task." confirmLabel="Remove member" onCancel={()=>setMemberToRemove(null)} onConfirm={()=>{void removeMember(memberToRemove).catch(e=>setSaveError(e.message));setMemberToRemove(null)}}/>}
       {pendingStatus && <ConfirmTaskDialog title={pendingStatus==='done'?'Mark shared task done?':'Reopen this shared task?'} message="This status change will be visible to every member." confirmLabel="Confirm change" onCancel={()=>setPendingStatus(null)} onConfirm={()=>{void save({status:pendingStatus});setPendingStatus(null)}}/>}

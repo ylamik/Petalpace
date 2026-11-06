@@ -137,3 +137,21 @@ test('each permission level can do exactly what it allows',async t=>{
  // Someone who isn't a member can't even read it.
  assert.equal((await f.request(path,'GET',undefined,1).then(()=>f.db.prepare('DELETE FROM collab_members WHERE user_id=?').run('u2')).then(()=>f.request(path,'GET',undefined,2))).status,403)
 })
+test('delegated tasks keep a status, and limited members can only change their own',async t=>{
+ const f=await fixture(t);let task=await f.create();const path='/api/collab/tasks/'+task.id
+ f.db.prepare('INSERT INTO collab_members VALUES(?,?,?,?)').run(task.id,'u1','steps',Date.now())
+ let result=await f.request(path,'PUT',{revision:task.revision,subtasks:[{title:'Mine',done:false,status:'progress',assignedTo:'u1'},{title:'Theirs',done:false,status:'blocked',assignedTo:'u0'}]})
+ assert.equal(result.status,200);task=result.body.task
+ assert.deepEqual(task.subtasks.map(s=>s.status),['progress','blocked'])
+ const as=(user,patch)=>f.request(path,'PUT',{revision:task.revision,...patch},user)
+ const step=(i,change)=>task.subtasks.map((s,j)=>j===i?{...s,...change}:s)
+ assert.equal((await as(1,{subtasks:step(1,{status:'todo'})})).status,403)
+ assert.equal((await as(1,{subtasks:step(0,{status:'nope'})})).status,400)
+ result=await as(1,{subtasks:step(0,{status:'blocked'})});assert.equal(result.status,200);task=result.body.task
+ assert.equal(task.subtasks[0].status,'blocked')
+ result=await as(1,{subtasks:step(0,{status:'done',done:true})});task=result.body.task
+ assert.equal(task.subtasks[0].status,'done');assert.equal(task.subtasks[0].done,true)
+ // Older clients that only send done still work.
+ result=await as(0,{subtasks:step(0,{done:false,status:undefined})});task=result.body.task
+ assert.equal(task.subtasks[0].status,'todo')
+})

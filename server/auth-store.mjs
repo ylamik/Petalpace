@@ -88,7 +88,9 @@ export function createAuthStore(path = ':memory:') {
     ['collab_invites','permission',"TEXT NOT NULL DEFAULT 'steps'"],
     ['collab_files','subtask_id','TEXT'],
     ['collab_subtasks','notes',"TEXT NOT NULL DEFAULT ''"],
-    ['collab_subtasks','links',"TEXT NOT NULL DEFAULT '[]'"]
+    ['collab_subtasks','links',"TEXT NOT NULL DEFAULT '[]'"],
+    ['collab_subtasks','status',"TEXT NOT NULL DEFAULT 'todo'"]
   ]) { if(!db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`) }
+  db.exec("UPDATE collab_subtasks SET status='done' WHERE done=1 AND status<>'done'")
   return db
 }

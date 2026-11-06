@@ -7,7 +7,6 @@ export type SpaceTask = TaskDraft & { id: string; spaceId: string; dueToday?: bo
 export const defaultSpaces: Space[] = [
   { id: 'school', name: 'School', color: '#D7E7FD' },
   { id: 'personal', name: 'Personal', color: '#FDDCCD' },
-  { id: 'creative', name: 'Creative', color: '#D6DDC9' },
 ]
 export type DeletedTask = SpaceTask & {deletedAt:number;expiresAt:number}
 export const SpacesContext = createContext<{

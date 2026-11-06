@@ -13,6 +13,7 @@ export interface CollabSubtask {
   id: string
   title: string
   done: boolean
+  status?: 'todo' | 'progress' | 'done' | 'blocked'
   assignedTo: string | null
   notes?: string
   links?: string[]
