@@ -2,6 +2,7 @@ import { ButtonSpinner } from '../ui/PageLoader'
 import { useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { accountRequest, AuthError, useAuth } from '../../features/auth/auth'
+import { passwordError, passwordProblems, passwordRuleLabels, type PasswordRule } from '../../features/auth/passwordRules'
 
 type AuthPageProps = {
   mode: 'sign-in' | 'sign-up' | 'verify-email' | 'forgot-password' | 'reset-password'
@@ -33,6 +34,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [notice, setNotice] = useState('')
   const [signInFailed, setSignInFailed] = useState(false)
+  const [typed, setTyped] = useState({ password: '', email: '', name: '' })
 
   async function submit(resend = false) {
     if (busyRef.current || !formRef.current?.reportValidity()) return
@@ -40,6 +42,10 @@ export default function AuthPage({ mode }: AuthPageProps) {
     const data = new FormData(form)
     const email = String(data.get('email') || '').trim()
     const password = String(data.get('password') || '')
+    if (newPassword) {
+      const weak = passwordError(passwordProblems(password, { email, name: String(data.get('name') || '') }))
+      if (weak) { setNotice(weak); return }
+    }
     if (newPassword && password !== data.get('confirmPassword')) { setNotice('Your passwords do not match.'); return }
     busyRef.current = true
     setBusy(true)
@@ -171,7 +177,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
                 : 'A little space to plan your day.'}
             </p>
 
-            <form ref={formRef} onSubmit={handleSubmit} className="mt-7 space-y-5" aria-busy={busy}>
+            <form ref={formRef} onSubmit={handleSubmit} onInput={event => { const form = event.currentTarget; const value = (field: string) => String(new FormData(form).get(field) || ""); if (newPassword) setTyped({ password: value("password"), email: value("email"), name: value("name") }) }} className="mt-7 space-y-5" aria-busy={busy}>
               <fieldset disabled={busy || finished} hidden={finished} className="space-y-5 disabled:opacity-70">
               {isSignUp && (
                 <div>
@@ -269,9 +275,20 @@ export default function AuthPage({ mode }: AuthPageProps) {
                 </div>
 
                 {newPassword && (
-                  <p id="password-hint" className="mt-2 text-xs text-gray">
-                    Use 15–128 characters. A few memorable words work well.
-                  </p>
+                  <div id="password-hint" className="mt-2 text-xs">
+                    <ul className="grid gap-1 sm:grid-cols-2">
+                      {(Object.keys(passwordRuleLabels) as PasswordRule[]).map(rule => {
+                        const met = typed.password !== '' && !passwordProblems(typed.password, typed).includes(rule)
+                        return (
+                          <li key={rule} className={`flex items-center gap-1.5 ${met ? 'text-done-ink' : 'text-gray'}`}>
+                            <span aria-hidden="true" className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] ${met ? 'border-done-stroke bg-done-badge' : 'border-dark-blue/25'}`}>{met ? '✓' : ''}</span>
+                            {passwordRuleLabels[rule]}<span className="sr-only">{met ? ' (done)' : ' (not yet)'}</span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                    <p className="mt-2 text-gray">Tip: a few random words with a number or symbol, like “Purple-Kettle-Dances-7”.</p>
+                  </div>
                 )}
 
                 {mode === 'sign-in' && (

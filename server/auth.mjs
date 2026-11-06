@@ -9,6 +9,7 @@ import { registerSSE } from './sse-broker.mjs'
 import { createCollabHandler } from './collab.mjs'
 import { randomBytes, randomUUID, createHash, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
+import { passwordError, passwordProblems } from '../src/features/auth/passwordRules.ts'
 import { prepareProfilePhoto } from './profile-photo.mjs'
 
 const derive = promisify(scrypt)
@@ -247,6 +248,9 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
         let passwordHash
         if (purpose === 'reset') {
           if (!validPassword(data.password)) return reply(400, { error: 'Use a password with 15–128 characters.' })
+          const owner = db.prepare('SELECT email, name FROM users WHERE id = ?').get(record.user_id)
+          const weak = passwordError(passwordProblems(data.password, owner || {}))
+          if (weak) return reply(400, { error: weak })
           passwordHash = await runHash(() => hashPassword(data.password))
         }
         // Recheck after asynchronous hashing; consume and mutate atomically.
@@ -279,6 +283,8 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
       if (action === 'register') {
         const name = typeof data.name === 'string' ? data.name.trim() : ''
         if (!name || name.length > 100 || !validPassword(password)) return reply(400, { error: 'Enter your name and a password with 15–128 characters.' })
+        const weak = passwordError(passwordProblems(password, { email, name }))
+        if (weak) return reply(400, { error: weak })
         const passwordHash = await runHash(() => hashPassword(password))
         // INSERT OR IGNORE also handles concurrent requests for the same email.
         db.prepare('INSERT OR IGNORE INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)').run(randomUUID(), email, name, passwordHash)

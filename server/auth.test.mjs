@@ -76,6 +76,7 @@ test('SQL injection strings remain data; invalid input and foreign origins are r
   assert.equal((await f.signup({ email: 'two..dots@example.com' })).status, 400)
   assert.equal((await f.signup({ email: '.leading@example.com' })).status, 400)
   assert.equal((await f.signup({ password: 'short' })).status, 400)
+  for (const weak of ['passwordpassword1', 'Password123!!!!!', 'all lowercase words here 1', 'Aaaaaaaaaaaaaaa1', 'Mikyla garden 2026!']) assert.equal((await f.signup({ password: weak, email: `weak${weak.length}${weak[0]}@example.com` })).status, 400, weak)
   assert.equal((await f.request('register', { email, password, name: 'Mikyla' }, '', 'https://evil.example')).status, 403)
   const name = "Mikyla'); DROP TABLE users; --"
   assert.equal((await f.signup({ name })).status, 200)
@@ -124,7 +125,7 @@ test('duplicate signup cannot replace a password; login attempts are limited', a
   const f = await fixture(t)
   await f.signup()
   const original = f.db.prepare('SELECT password_hash FROM users').get().password_hash
-  await f.signup({ password: 'An attacker password here' })
+  await f.signup({ password: 'An attacker password here!' })
   assert.equal(f.db.prepare('SELECT password_hash FROM users').get().password_hash, original)
   assert.equal(f.messages.length, 1)
   for (let i = 0; i < 10; i++) assert.equal((await f.request('login', { email, password: 'incorrect password' })).status, 401)
