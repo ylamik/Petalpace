@@ -5,25 +5,25 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type SetState
 import { SpacesContext, type Space, type SpaceTask, type DeletedTask } from './spaces'
 import { useAuth } from '../auth/auth'
 import { usePlannerSync } from '../../hooks/usePlannerSync'
+import { isStoredFile, type StoredFile, type TaskFile } from '../tasks/taskFiles'
 import { mergePlanner, applyLocalVersion, describeConflict, type ItemConflict } from './mergePlanner'
 type Snapshot={spaces:Space[];tasks:SpaceTask[]}
 type WireFile={name:string;type:string;lastModified:number;data:string}
-const fileReferences = new WeakMap<File, {taskId:string;index:number}>()
-type WireTask=Omit<SpaceTask,'files'> & {files:WireFile[]}
-const decode=(task:WireTask)=>({...task,files:task.files.map((file,index)=>{
-  const decoded=new File([Uint8Array.from(atob(file.data),c=>c.charCodeAt(0))],file.name,{type:file.type,lastModified:file.lastModified})
-  fileReferences.set(decoded,{taskId:task.id,index})
-  return decoded
-})})
-const decodeTrash=(items:(WireTask & {deletedAt:number;expiresAt:number})[]=[])=>items.map(item=>({...decode(item),deletedAt:item.deletedAt,expiresAt:item.expiresAt}))
+// Files picked in this tab stay as File objects after saving; this remembers their stored id.
+const storedIds = new WeakMap<File, string>()
 const encode=(file:File)=>new Promise<WireFile>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('Could not read an attachment. Please remove it and try again.'));reader.onload=()=>resolve({name:file.name,type:file.type,lastModified:file.lastModified,data:String(reader.result).split(',')[1]});reader.readAsDataURL(file)})
+const wireFile=(file:TaskFile)=>{
+  if(isStoredFile(file))return Promise.resolve({id:file.id})
+  const id=storedIds.get(file)
+  return id?Promise.resolve({id}):encode(file)
+}
 class ConflictError extends Error {}
 async function request(data?:unknown) {
   const response=await fetch('/api/auth/planner',{method:data?'PUT':'GET',credentials:'same-origin',cache:'no-store',headers:data?{'Content-Type':'application/json'}:undefined,body:data?JSON.stringify(data):undefined,signal:AbortSignal.timeout(30000)})
   const result=await response.json().catch(()=>null)
   if(response.status===409) throw new ConflictError(result?.error || 'Your planner changed in another tab.')
   if(!response.ok || !result) throw new Error(result?.error || 'Could not reach your planner. Keep this page open and try again.')
-  if(result.binVersion!==1 || !Array.isArray(result.trash))throw new Error('Your running server needs an update for safe deletion. Stop the existing terminal process with Ctrl+C, run npm run dev again, then reload this page.')
+  if(result.binVersion!==2 || !Array.isArray(result.trash))throw new Error('Your running server needs an update for safe deletion. Stop the existing terminal process with Ctrl+C, run npm run dev again, then reload this page.')
   return result
 }
 export default function SpacesProvider({children}:{children:ReactNode}) {
@@ -47,9 +47,9 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
     let cancelled=false
     request().then(result=>{
       if(cancelled)return
-      const tasks=(result.tasks as WireTask[]).map(task=>decode({...task,dueZone:task.dueZone || Intl.DateTimeFormat().resolvedOptions().timeZone}))
+      const tasks=(result.tasks as SpaceTask[]).map(task=>({...task,dueZone:task.dueZone || Intl.DateTimeFormat().resolvedOptions().timeZone}))
       const initial={spaces:result.spaces as Space[],tasks}
-      trashRef.current=decodeTrash(result.trash);setTrash(trashRef.current);revision.current=result.revision;saved.current=(result.tasks as WireTask[]).some(t=>!t.dueZone)?{...initial,tasks:(result.tasks as WireTask[]).map(decode)}:initial;setActivity(result.activity);setData(initial)
+      trashRef.current=result.trash;setTrash(trashRef.current);revision.current=result.revision;saved.current=(result.tasks as SpaceTask[]).some(t=>!t.dueZone)?{...initial,tasks:result.tasks as SpaceTask[]}:initial;setActivity(result.activity);setData(initial)
     }).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Could not load your planner.')})
     return()=>{cancelled=true;alive.current=false}
   },[])
@@ -73,8 +73,8 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
       if(!alive.current) return
       if(pending.current || running.current || failed.current || saved.current!==start || document.querySelector('dialog[open]')) return
       if(result.revision>revision.current){
-        const fresh={spaces:result.spaces as Space[],tasks:(result.tasks as WireTask[]).map(decode)}
-        trashRef.current=decodeTrash(result.trash);setTrash(trashRef.current)
+        const fresh={spaces:result.spaces as Space[],tasks:result.tasks as SpaceTask[]}
+        trashRef.current=result.trash;setTrash(trashRef.current)
         revision.current=result.revision;saved.current=fresh;setData(fresh);setActivity(result.activity)
       }
       remotePending.current=false
@@ -91,7 +91,7 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
       while(pending.current && alive.current){
         const snapshot=pending.current;pending.current=null
         try{
-          const tasks=await Promise.all(snapshot.tasks.map(async task=>({...task,files:await Promise.all(task.files.map(file=>fileReferences.has(file)?Promise.resolve({ref:fileReferences.get(file)!}):encode(file)))})))
+          const tasks=await Promise.all(snapshot.tasks.map(async task=>({...task,files:await Promise.all(task.files.map(wireFile))})))
           if(!alive.current)break
           const purgeIds=[...purgeIdsRef.current]
           const result=await request({...snapshot,tasks,purgeIds,revision:revision.current,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone})
@@ -107,12 +107,12 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
             const restored=snapshot.tasks.filter(task=>trashRef.current.some(deleted=>deleted.id===task.id)).length
             setNotice({message:restored===added?(added===1?'Task restored!':`${added} tasks restored!`):(added===1?'Task added!':`${added} tasks added!`),id:Date.now(),taskLink:true})
           }
-          else if(alive.current && removedTasks) setNotice({message:`${removedTasks===1?'Task':`${removedTasks} tasks`} deleted. You can undo this.`,id:Date.now(),binLink:true,undoTasks:decodeTrash(result.trash).filter(task=>removed.some(item=>item.id===task.id))})
+          else if(alive.current && removedTasks) setNotice({message:`${removedTasks===1?'Task':`${removedTasks} tasks`} deleted. You can undo this.`,id:Date.now(),binLink:true,undoTasks:(result.trash as DeletedTask[]).filter(task=>removed.some(item=>item.id===task.id))})
           else if(alive.current && moved.length && !removedSpaces) setNotice({message:moved.length===1?`Task moved to ${moved[0].space}.`:`${moved.length} tasks moved.`,id:Date.now()})
           else if(alive.current && removedSpaces) setNotice({message:'Space deleted. Your tasks are safe in their selected space.',id:Date.now()})
-          snapshot.tasks.forEach(task=>task.files.forEach((file,index)=>fileReferences.set(file,{taskId:task.id,index})))
+          snapshot.tasks.forEach(task=>task.files.forEach((file,index)=>{const stored=(result.files as Record<string,StoredFile[]>)?.[task.id]?.[index];if(stored && !isStoredFile(file))storedIds.set(file,stored.id)}))
           revision.current=result.revision;saved.current=snapshot
-          if(alive.current){trashRef.current=decodeTrash(result.trash);setTrash(trashRef.current);setActivity(result.activity);setError('')}
+          if(alive.current){trashRef.current=result.trash;setTrash(trashRef.current);setActivity(result.activity);setError('')}
         }catch(e){
           let failure=e
           // Another tab or device saved first: fetch the latest planner, replay this tab's edits on top of it, and save again.
@@ -121,7 +121,7 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
             try{
               const result=await request()
               if(!alive.current)break
-              const remote={spaces:result.spaces as Space[],tasks:(result.tasks as WireTask[]).map(decode)}
+              const remote={spaces:result.spaces as Space[],tasks:result.tasks as SpaceTask[]}
               const {merged,conflicts:clashes,relocations,unpinned}=mergePlanner<Space,SpaceTask>(saved.current ?? {spaces:[],tasks:[]},pending.current ?? snapshot,remote)
               const notes=relocations.map(({from,to,count})=>`“${from}” was deleted in another tab or device, so ${count===1?'1 task was':`${count} tasks were`} moved to ${to}.`)
               if(unpinned) notes.push(`Your top 3 was already full from another tab or device, so ${unpinned===1?'1 task was':`${unpinned} tasks were`} unpinned.`)
@@ -129,7 +129,7 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
               // Conflicting fields were saved with the other version; let the user apply theirs instead.
               if(clashes.length) setConflicts(current=>[...current.filter(item=>!clashes.some(next=>next.id===item.id)),...clashes])
               revision.current=result.revision;saved.current=remote
-              trashRef.current=decodeTrash(result.trash);setTrash(trashRef.current);setActivity(result.activity)
+              trashRef.current=result.trash;setTrash(trashRef.current);setActivity(result.activity)
               pending.current=merged;setData(merged)
               continue
             }catch(next){failure=next}
@@ -198,7 +198,7 @@ export default function SpacesProvider({children}:{children:ReactNode}) {
     setNotice({message:'Restoring your tasks...',id:Date.now()})
   }
   if(!data) {
-    if(error) return <main className="min-h-dvh bg-page p-8 font-serif text-dark-blue"><p role="alert">{error}</p><button type="button" onClick={()=>window.location.reload()} className="mt-4 rounded-lg bg-blue px-4 py-2 text-white">Try again</button></main>
+    if(error) return <main className="min-h-dvh bg-page p-8 font-sans text-dark-blue"><p role="alert">{error}</p><button type="button" onClick={()=>window.location.reload()} className="mt-4 rounded-lg bg-blue px-4 py-2 text-white">Try again</button></main>
     return <PageLoader label="Opening your planner…" />
   }
   return <SpacesContext.Provider value={{...data,trash,permanentlyDelete,setSpaces,setTasks,deleteSpace,activity,saving,syncing,notify,ensureSaved,resetActivity}}>

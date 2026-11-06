@@ -27,7 +27,10 @@ async function fixture(t,path=':memory:',cleanup=()=>{}){
     const response=await fetch(`http://127.0.0.1:${server.address().port}/api/auth/planner`,{method:'DELETE',headers:{cookie:`petalpace_session=${tokens[user]}`,origin},signal:AbortSignal.timeout(5000)})
     return {status:response.status,body:await response.json()}
   }
-  return {request,reset,db,advance:days=>{clock+=days*86400000}}
+  const base=()=>`http://127.0.0.1:${server.address().port}/api/auth`
+  const download=(id,user=0)=>fetch(`${base()}/planner/files/${id}`,{headers:user===null?{}:{cookie:`petalpace_session=${tokens[user]}`},signal:AbortSignal.timeout(5000)})
+  const exportZip=()=>fetch(`${base()}/export`,{headers:{cookie:`petalpace_session=${tokens[0]}`},signal:AbortSignal.timeout(5000)})
+  return {request,reset,download,exportZip,db,advance:days=>{clock+=days*86400000}}
 }
 test('a stale save gets 409, then saving the refetched planner with the new revision keeps both tabs edits',async t=>{
   const f=await fixture(t);const start=(await f.request()).body
@@ -73,7 +76,8 @@ test('new accounts start empty; spaces/tasks/files persist and remain isolated',
   assert.equal(saved.status,200)
   const other=await f.request(undefined,1);assert.deepEqual(other.body.tasks,[])
   const reread=createAuthStore(path)
-  assert.equal(JSON.parse(reread.prepare('SELECT data FROM planners WHERE user_id=?').get('user0').data).tasks[0].files[0].data,file.data);reread.close()
+  const row=reread.prepare('SELECT data FROM planner_files WHERE user_id=?').get('user0')
+  assert.equal(Buffer.from(row.data).toString('base64'),file.data);assert.equal(reread.prepare('SELECT data FROM planners WHERE user_id=?').get('user0').data.includes(file.data),false);reread.close()
   const own=await f.request();assert.equal(own.body.tasks[0].spaceId,'custom');assert.equal(own.body.spaces.at(-1).color,'#123456')
 })
 test('heatmap counts real transitions, not edits; reopening removes count, deletion preserves history',async t=>{
@@ -133,7 +137,7 @@ test('deleting a space moves tasks atomically and preserves attachments and comp
   const restored=(await f.request()).body
   assert.equal(restored.spaces.some(space=>space.id==='school'),false)
   assert.equal(restored.tasks[0].spaceId,'personal')
-  assert.deepEqual(restored.tasks[0].files,[file])
+  assert.equal(restored.tasks[0].files[0].name,file.name)
   assert.deepEqual(restored.tasks[0].links,['https://example.com'])
   assert.deepEqual(restored.activity,state.activity)
   assert.ok((await f.request(undefined,1)).body.spaces.some(space=>space.id==='school'))
@@ -170,7 +174,7 @@ test('bulk deletion archives attachments; restore keeps original completion day 
   const original=state.tasks[0],history=state.activity
   const removed=await f.request({...state,tasks:[]})
   assert.equal(removed.status,200);assert.equal(removed.body.trash.length,2)
-  assert.deepEqual(removed.body.trash.find(item=>item.id===original.id).files,[file])
+  assert.deepEqual(removed.body.trash.find(item=>item.id===original.id).files,original.files)
   assert.equal(removed.body.trash[0].expiresAt-removed.body.trash[0].deletedAt,30*86400000)
   assert.deepEqual((await f.request(undefined,1)).body.trash,[])
   assert.equal((await f.request({...state,tasks:[original]})).status,409)
@@ -215,7 +219,7 @@ test('restoring to a different space works after the original space has been rem
 
 test('Bin contract is explicit and permanent deletion is account scoped and cannot be restored',async t=>{
   const f=await fixture(t);let state=(await f.request()).body
-  assert.equal(state.binVersion,1)
+  assert.equal(state.binVersion,2)
   await f.request({...state,tasks:[task(),task({id:'task-2'})]})
   state=(await f.request()).body
   const originals=state.tasks
@@ -226,7 +230,7 @@ test('Bin contract is explicit and permanent deletion is account scoped and cann
   assert.equal((await f.request({...other,purgeIds:['task-1']},1)).status,400)
   assert.equal((await f.request()).body.trash.length,2)
   const result=await f.request({...state,purgeIds:['task-1','task-2']})
-  assert.equal(result.status,200);assert.equal(result.body.binVersion,1);assert.deepEqual(result.body.trash,[])
+  assert.equal(result.status,200);assert.equal(result.body.binVersion,2);assert.deepEqual(result.body.trash,[])
   state=(await f.request()).body
   assert.deepEqual(state.trash,[])
   assert.equal((await f.request({...state,tasks:originals})).status,400)
@@ -276,9 +280,10 @@ test('moving a task between existing spaces preserves data and remains account s
   const f=await fixture(t)
   let state=(await f.request()).body
   const file={name:'notes.pdf',type:'application/pdf',lastModified:1,data:Buffer.from('%PDF-example').toString('base64')}
-  const original=task({notes:'Keep my notes',steps:['Read','Summarize'],completedSteps:[0],files:[file],links:['https://example.com'],dueDate:'2032-11-30',dueTime:'09:30',started:true})
-  assert.equal((await f.request({...state,tasks:[original]})).status,200)
+  const draft=task({notes:'Keep my notes',steps:['Read','Summarize'],completedSteps:[0],files:[file],links:['https://example.com'],dueDate:'2032-11-30',dueTime:'09:30',started:true})
+  assert.equal((await f.request({...state,tasks:[draft]})).status,200)
   state=(await f.request()).body
+  const original=state.tasks[0]
   assert.equal((await f.request({...state,tasks:state.tasks.map(item=>({...item,space:'Personal'}))})).status,200)
   state=(await f.request()).body
   const moved=state.tasks[0]
@@ -294,23 +299,79 @@ test('moving a task between existing spaces preserves data and remains account s
 test('existing file references survive edits and cannot read another account files', async t=>{
   const f=await fixture(t);let state=(await f.request()).body
   const file={name:'notes.pdf',type:'application/pdf',lastModified:1,data:Buffer.from('%PDF-test').toString('base64')}
-  await f.request({...state,tasks:[task({files:[file]})]});state=(await f.request()).body
-  assert.equal((await f.request({...state,tasks:[{...state.tasks[0],title:'Changed',files:[{ref:{taskId:'task-1',index:0}}]}]})).status,200)
-  state=(await f.request()).body;assert.deepEqual(state.tasks[0].files,[file])
+  const saved=await f.request({...state,tasks:[task({files:[file]})]});state=(await f.request()).body
+  const stored=state.tasks[0].files[0]
+  assert.deepEqual(saved.body.files['task-1'],[stored])
+  assert.equal((await f.request({...state,tasks:[{...state.tasks[0],title:'Changed',files:[{id:stored.id}]}]})).status,200)
+  state=(await f.request()).body;assert.deepEqual(state.tasks[0].files,[stored])
   const other=(await f.request(undefined,1)).body
-  assert.equal((await f.request({...other,tasks:[task({files:[{ref:{taskId:'task-1',index:0}}]})]},1)).status,400)
+  assert.equal((await f.request({...other,tasks:[task({files:[{id:stored.id}]})]},1)).status,400)
   await f.request({...state,tasks:[]});state=(await f.request()).body
-  assert.equal((await f.request({...state,tasks:[task({files:[{ref:{taskId:'task-1',index:0}}]})]})).status,200)
+  assert.equal((await f.request({...state,tasks:[task({files:[{id:stored.id}]})]})).status,200)
+})
+
+test('planner and Bin responses carry metadata only; files download on demand for their owner',async t=>{
+  const f=await fixture(t);let state=(await f.request()).body
+  const bytes=Buffer.concat([Buffer.from('%PDF-'),Buffer.alloc(1024*1024,7)])
+  const file={name:'big "notes".pdf',type:'application/pdf',lastModified:1,data:bytes.toString('base64')}
+  const put=await f.request({...state,tasks:[task({files:[file]})]});assert.equal(put.status,200)
+  assert.ok(JSON.stringify(put.body).length<5000)
+  const loaded=await f.request();state=loaded.body
+  assert.ok(JSON.stringify(state).length<5000)
+  const [stored]=state.tasks[0].files
+  assert.deepEqual(Object.keys(stored).sort(),['id','lastModified','name','size','type']);assert.equal(stored.size,bytes.length)
+  const removed=await f.request({...state,tasks:[]})
+  assert.ok(JSON.stringify(removed.body).length<5000)
+  assert.equal(removed.body.trash[0].files[0].data,undefined)
+  assert.ok(JSON.stringify((await f.request()).body).length<5000)
+  const download=await f.download(stored.id);assert.equal(download.status,200)
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()),bytes)
+  assert.equal(download.headers.get('content-type'),'application/octet-stream')
+  assert.equal(download.headers.get('x-content-type-options'),'nosniff')
+  assert.match(download.headers.get('content-disposition'),/^attachment; filename="download"; filename\*=UTF-8''big%20%22notes%22\.pdf$/)
+  assert.equal((await f.download(stored.id,1)).status,404)
+  assert.equal((await f.download(stored.id,null)).status,401)
+  assert.equal((await f.download('../../etc/passwd')).status,404)
+})
+
+test('file bytes are dropped when removed, permanently deleted, or expired from the Bin',async t=>{
+  const f=await fixture(t);let state=(await f.request()).body
+  const count=()=>f.db.prepare('SELECT count(*) AS n FROM planner_files').get().n
+  const file=name=>({name,type:'application/pdf',lastModified:1,data:Buffer.from('%PDF-test').toString('base64')})
+  await f.request({...state,tasks:[task({id:'a',files:[file('a.pdf'),file('b.pdf')]}),task({id:'b',files:[file('c.pdf')]}),task({id:'c',files:[file('d.pdf')]})]})
+  state=(await f.request()).body;assert.equal(count(),4)
+  await f.request({...state,tasks:state.tasks.map(item=>item.id==='a'?{...item,files:item.files.slice(0,1)}:item)})
+  state=(await f.request()).body;assert.equal(count(),3)
+  await f.request({...state,tasks:[]});state=(await f.request()).body;assert.equal(count(),3)
+  await f.request({...state,purgeIds:['a']});state=(await f.request()).body;assert.equal(count(),2)
+  f.db.prepare('UPDATE sessions SET expires=?').run(Date.UTC(2030,0,1));f.advance(31);await f.request();assert.equal(count(),0)
+})
+
+test('attachments saved inside the JSON move to planner_files on start and export still includes them',async t=>{
+  const f=await fixture(t);const state=(await f.request()).body
+  const body=Buffer.from('%PDF-legacy'),file={name:'old.pdf',type:'application/pdf',lastModified:5,data:body.toString('base64')}
+  f.db.prepare('INSERT INTO planners VALUES(?,?,?)').run('user0',0,JSON.stringify({spaces:state.spaces,tasks:[{...task({id:'live',files:[file]}),spaceId:'school'}]}))
+  f.db.prepare('INSERT INTO task_trash VALUES(?,?,?,?)').run('user0','gone',Date.UTC(2026,10,1,12),JSON.stringify({...task({id:'gone',files:[file]}),spaceId:'school'}))
+  createAuthHandler({db:f.db,env:{APP_URL:'http://localhost:5173'},now:()=>Date.UTC(2026,10,1,12)})
+  createAuthHandler({db:f.db,env:{APP_URL:'http://localhost:5173'},now:()=>Date.UTC(2026,10,1,12)})
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM planner_files').get().n,2)
+  const loaded=(await f.request()).body,[stored]=loaded.tasks[0].files
+  assert.deepEqual({...stored,id:''},{id:'',name:'old.pdf',type:'application/pdf',lastModified:5,size:body.length})
+  assert.equal(loaded.trash[0].files[0].data,undefined)
+  assert.deepEqual(Buffer.from(await (await f.download(stored.id)).arrayBuffer()),body)
+  assert.ok(Buffer.from(await (await f.exportZip()).arrayBuffer()).includes(body))
 })
 
 test('quota uses final raw bytes; restore and purge free storage without double counting', async t=>{
   const f=await fixture(t);let state=(await f.request()).body
-  const file=mb=>{const b=Buffer.alloc(mb*1024*1024);b.write('%PDF');return {name:'notes.pdf',type:'application/pdf',lastModified:0,data:b.toString('base64')}}
-  const active=[task({id:'a',files:[file(10)]}),task({id:'b',files:[file(10)]})]
-  const deleted=['c','d','e'].map(id=>task({id,files:[file(9)]}))
+  const mb=1024*1024
+  const stored=(id,size)=>{f.db.prepare('INSERT INTO planner_files(id,user_id,name,type,last_modified,size,data) VALUES(?,?,?,?,?,?,?)').run(id,'user0','notes.pdf','application/pdf',0,size,Buffer.from('%PDF'));return {id,name:'notes.pdf',type:'application/pdf',lastModified:0,size}}
+  const file=size=>{const b=Buffer.alloc(size*mb);b.write('%PDF');return {name:'notes.pdf',type:'application/pdf',lastModified:0,data:b.toString('base64')}}
+  const active=[task({id:'a',files:[stored('fa',10*mb)]}),task({id:'b',files:[stored('fb',10*mb)]})]
+  const deleted=['c','d','e'].map(id=>task({id,files:[stored('f'+id,9*mb)]}))
   f.db.prepare('INSERT INTO planners VALUES(?,?,?)').run('user0',0,JSON.stringify({spaces:state.spaces,tasks:active}))
   for(const item of deleted)f.db.prepare('INSERT INTO task_trash VALUES(?,?,?,?)').run('user0',item.id,Date.UTC(2026,10,1,12),JSON.stringify(item))
-  const refs=items=>items.map(item=>({...item,files:[{ref:{taskId:item.id,index:0}}]}))
+  const refs=items=>items.map(item=>({...item,files:item.files.map(({id})=>({id}))}))
   const restored=await f.request({...state,tasks:refs([...active,deleted[0]])})
   assert.equal(restored.status,200)
   const purged=await f.request({...state,revision:1,tasks:refs([...active,deleted[0]]),purgeIds:['d','e']})
@@ -319,6 +380,7 @@ test('quota uses final raw bytes; restore and purge free storage without double 
   const grow=await f.request({...state,revision:2,tasks:[task({id:'new1',files:[file(10)]}),task({id:'new2',files:[file(10)]}),task({id:'new3',files:[file(10)]})]})
   assert.equal(grow.status,400)
   assert.equal((await f.request()).body.revision,2)
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM planner_files').get().n,3)
 })
 
 test('duplicate core task fields are rejected but a different deadline is allowed',async t=>{

@@ -1,5 +1,4 @@
 import { useSpaces } from '../features/spaces/spaces'
-import ProfileMenu from '../components/auth/ProfileMenu'
 import { useState } from 'react'
 import AddTaskDialog, { type TaskDraft } from '../features/tasks/components/AddTaskDialog'
 import TaskDetailsPanel from '../features/tasks/components/TaskDetailsPanel'
@@ -53,7 +52,6 @@ export default function AllTasksPage() {
           >
             + Add task
           </button>
-          <div className="hidden lg:block"><ProfileMenu /></div>
         </div>
       </header>
 

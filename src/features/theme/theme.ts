@@ -5,9 +5,11 @@ export function readTheme(): ThemePreference {
   if (memory) return memory
   try { const value = localStorage.getItem(key); return value === 'light' || value === 'dark' ? value : 'system' } catch { return 'system' }
 }
+// The home and account pages are designed for light mode only.
+const lightOnly = new Set(['/', '/sign-in', '/sign-up', '/verify-email', '/forgot-password', '/reset-password'])
 export function applyTheme() {
   const preference = readTheme()
-  document.documentElement.dataset.theme = preference === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : preference
+  document.documentElement.dataset.theme = lightOnly.has(window.location.pathname) ? 'light' : preference === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : preference
 }
 export function setTheme(preference: ThemePreference) {
   memory = preference

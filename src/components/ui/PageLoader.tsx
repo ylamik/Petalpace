@@ -9,7 +9,7 @@ export default function PageLoader({ label = 'Loading…' }: { label?: string })
     <div
       role="status"
       aria-label={label}
-      className="flex min-h-dvh flex-col items-center justify-center gap-5 font-serif"
+      className="flex min-h-dvh flex-col items-center justify-center gap-5 font-sans"
       style={{ background: 'var(--color-page, #faf7ef)', color: 'var(--color-gray, #5f5f5f)' }}
     >
       <div className="relative flex h-14 w-14 items-center justify-center" aria-hidden="true">

@@ -33,7 +33,7 @@ export default function CollabJoinPage() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-page p-6 font-serif text-dark-blue">
+    <main className="flex min-h-dvh items-center justify-center bg-page p-6 font-sans text-dark-blue">
       <div className="w-full max-w-[440px] rounded-2xl border border-dark-blue/15 bg-surface p-7 shadow-xl">
         <img src="/images/petalpace-logo.png" alt="Petalpace" className="mb-6 h-auto w-32" />
 

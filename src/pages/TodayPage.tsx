@@ -1,12 +1,12 @@
 import { taskDaysUntil } from '../features/tasks/components/taskPresentation'
 import { usePlannerClock } from '../hooks/usePlannerClock'
+import StepsCount from "../features/tasks/components/StepsCount";
 import DeadlineLabel from '../features/tasks/components/DeadlineLabel';
 import { useSpaces, type SpaceTask as Task } from "../features/spaces/spaces";
-import { compareTasks, isDeadlineOverdue } from "../features/tasks/components/taskPresentation";
+import { compareTasks, effectiveDue, isDeadlineOverdue } from "../features/tasks/components/taskPresentation";
 import ActivityHeatmap from "../features/tasks/components/ActivityHeatmap";
 import TaskRows from "../features/tasks/components/TaskRows";
 import TaskSpaceBadge from "../features/tasks/components/TaskSpaceBadge";
-import ProfileMenu from "../components/auth/ProfileMenu";
 import { useState } from "react";
 import { Link } from "react-router";
 import AddTaskDialog, {
@@ -63,7 +63,7 @@ function TaskBadges({ task }: { task: Task }) {
 }
 
 export default function TodayPage() {
-  const { tasks: allTasks, setTasks, notify: setNotice } = useSpaces();
+  const { tasks: allTasks, spaces, setTasks, notify: setNotice } = useSpaces();
   const clock = usePlannerClock();
 
   // Today shows: tasks due today (any status), overdue unfinished tasks,
@@ -166,10 +166,6 @@ export default function TodayPage() {
             />
           </div>
         </div>
-
-        <div className="hidden lg:block">
-          <ProfileMenu />
-        </div>
       </header>
 
       {/* Quick add */}
@@ -259,8 +255,8 @@ export default function TodayPage() {
                   <div className="mt-2"><DeadlineLabel task={task}/></div>
 
                   {!!task.steps?.length && (
-                    <p className="mt-2 text-xs text-gray">
-                      {task.steps.length} steps
+                    <p className="mt-2">
+                      <StepsCount total={task.steps.length} done={(task.completedSteps ?? []).filter((i) => i >= 0 && i < task.steps!.length).length} />
                     </p>
                   )}
                 </div>
@@ -287,7 +283,7 @@ export default function TodayPage() {
       </section>
 
       {/* Task list and right column */}
-      <div className="mt-5 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
+      <div className="mt-5 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <section
           aria-labelledby="today-title"
           className={`${cardShadow} min-w-0 bg-surface p-4`}
@@ -365,17 +361,14 @@ export default function TodayPage() {
           {/* Upcoming */}
           <section
             aria-labelledby="upcoming-title"
-            className={`${cardShadow} bg-panel-blue p-4`}
+            className="rounded-2xl border border-dark-blue/15 bg-surface p-5 shadow-[0_2px_3px_rgba(0,0,0,0.22)]"
           >
             <div className="flex items-center justify-between gap-2">
               <h2 id="upcoming-title" className="text-xl font-bold">
                 Upcoming
               </h2>
 
-              <Link
-                to="/upcoming"
-                className="text-xs text-link hover:underline"
-              >
+              <Link to="/planner" className="text-sm font-semibold text-link hover:underline">
                 See all →
               </Link>
             </div>
@@ -385,23 +378,35 @@ export default function TodayPage() {
                 No upcoming deadlines. A little room to breathe.
               </p>
             )}
-            <ul className="mt-2 divide-y divide-dark-blue/10">
-              {upcoming.map((task) => (
-                <li key={task.id}>
-                  <Link
-                    to="/upcoming"
-                    className="flex items-center justify-between gap-2 rounded py-3 hover:bg-surface/60"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold">{task.title}</p>
-                      <div className="mt-1"><DeadlineLabel task={task}/></div>
-                    </div>
-                    <span aria-hidden="true" className="text-gray">
-                      ›
-                    </span>
-                  </Link>
-                </li>
-              ))}
+            <ul className="mt-3 space-y-1">
+              {upcoming.map((task) => {
+                const due = new Date(`${effectiveDue(task)}T12:00:00`);
+                const color = spaces.find((space) => space.id === task.spaceId || space.name === task.space)?.color;
+                return (
+                  <li key={task.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTaskId(task.id)}
+                      aria-haspopup="dialog"
+                      className="flex w-full cursor-pointer items-center gap-3 rounded-xl p-1.5 text-left hover:bg-beige/60 focus-visible:outline-2 focus-visible:outline-blue"
+                    >
+                      <span className="flex h-12 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-beige">
+                        <span className="text-[0.6875rem] font-semibold leading-tight tracking-wide text-gray">
+                          {due.toLocaleDateString("en", { weekday: "short" }).toUpperCase()}
+                        </span>
+                        <span className="font-serif text-lg font-semibold leading-tight">{due.getDate()}</span>
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[0.9375rem] font-medium" title={task.title}>{task.title}</span>
+                        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-gray">
+                          <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                          <span className="truncate">{task.space}</span>
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         </div>

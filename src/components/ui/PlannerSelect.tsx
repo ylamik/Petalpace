@@ -13,7 +13,7 @@ function PriorityFlag({value}: {value: string}) {
   if (!color) return null
   return <svg aria-hidden="true" className={`h-4 w-4 shrink-0 ${color}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 21V3m0 1c5-3 9 3 14 0v10c-5 3-9-3-14 0" fill="currentColor" fillOpacity="0.2"/></svg>
 }
-export default function PlannerSelect({value,onChange,options,label,className='',priorityIcons=false,tone='neutral'}:{value:string;onChange:(value:string)=>void;options:SelectChoice[];label:string;className?:string;priorityIcons?:boolean;tone?:SelectTone}) {
+export default function PlannerSelect({value,onChange,options,label,className='',priorityIcons=false,tone='neutral',prefix}:{prefix?:string;value:string;onChange:(value:string)=>void;options:SelectChoice[];label:string;className?:string;priorityIcons?:boolean;tone?:SelectTone}) {
   const textSize = 'text-sm'
   const [open,setOpen]=useState(false),[active,setActive]=useState(0)
   const [position,setPosition]=useState({left:0,top:0,width:220,maxHeight:280})
@@ -35,9 +35,9 @@ export default function PlannerSelect({value,onChange,options,label,className=''
   return <>
     <button ref={trigger} type="button" role="combobox" aria-label={label} aria-expanded={open} aria-controls={id} aria-haspopup="listbox" onClick={()=>open?close():show()} onKeyDown={e=>{if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();show()}}} className={`flex min-h-11 min-w-0 max-w-full items-center gap-3 rounded-lg ${tones[tone]} px-3 py-2 text-left ${textSize} focus-visible:outline-2 focus-visible:outline-blue ${className}`}>
       {priorityIcons && <PriorityFlag value={value}/>}
-      {selected?.color && <span aria-hidden="true" className="h-3.5 w-3.5 shrink-0 rounded-full border border-dark-blue/20" style={{backgroundColor:selected.color}}/>}<span className="min-w-0 flex-1 truncate">{selected?.label??'Select…'}</span><svg aria-hidden="true" className="ml-2 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="m6 9 6 6 6-6"/></svg>
+      {selected?.color && <span aria-hidden="true" className="h-3.5 w-3.5 shrink-0 rounded-full border border-dark-blue/20" style={{backgroundColor:selected.color}}/>}{prefix && <span className="shrink-0 text-gray">{prefix}</span>}<span className="min-w-0 flex-1 truncate">{selected?.label??'Select…'}</span><svg aria-hidden="true" className="ml-2 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="m6 9 6 6 6-6"/></svg>
     </button>
-    {open && <div ref={menu} id={id} role="listbox" aria-label={label} aria-activedescendant={`${id}-${active}`} tabIndex={-1} popover="manual" style={{position:'fixed',inset:'auto',margin:0,...position}} className="z-[100] overflow-y-auto rounded-xl border border-dark-blue/20 bg-surface p-1.5 font-serif text-dark-blue shadow-xl outline-none" onKeyDown={e=>{
+    {open && <div ref={menu} id={id} role="listbox" aria-label={label} aria-activedescendant={`${id}-${active}`} tabIndex={-1} popover="manual" style={{position:'fixed',inset:'auto',margin:0,...position}} className="z-[100] overflow-y-auto rounded-xl border border-dark-blue/20 bg-surface p-1.5 font-sans text-dark-blue shadow-xl outline-none" onKeyDown={e=>{
       if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close()}
       else if(e.key==='Tab'){setOpen(false);trigger.current?.focus()}
       else if(e.key==='ArrowDown' || e.key==='ArrowUp'){e.preventDefault();setActive(i=>(i+(e.key==='ArrowDown'?1:-1)+options.length)%options.length)}

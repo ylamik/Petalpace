@@ -1,5 +1,4 @@
 import TaskRows from '../features/tasks/components/TaskRows'
-import ProfileMenu from '../components/auth/ProfileMenu'
 import { useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router'
 import { useSpaces } from '../features/spaces/spaces'
@@ -79,10 +78,6 @@ function SpaceContent({ spaceId }: { spaceId: string }) {
           >
             + Add task
           </button>
-
-          <div className="hidden lg:block">
-            <ProfileMenu />
-          </div>
         </div>
       </header>
 

@@ -32,3 +32,25 @@ test('email reminders opt in, skip active work, deduplicate restarts and retry s
  await run();assert.equal(messages.length,3)
  db.close()
 })
+test('reminder scans read planner JSON only after its revision changes',async()=>{
+ const db=createAuthStore();const clock=Date.parse('2026-11-03T00:00Z');let messages=0,reads=0
+ db.prepare('INSERT INTO users VALUES(?,?,?,?,1)').run('u','u@example.com','User','hash')
+ createPlannerHandler({db,findSession:()=>null,origins:[],limit:()=>{}})
+ const prepare=db.prepare.bind(db)
+ db.prepare=sql=>{if(sql.startsWith('SELECT data FROM planners'))reads++;return prepare(sql)}
+ const task={id:'task',title:'Essay',dueDate:'2026-11-04',dueTime:'08:00',dueZone:'Asia/Manila',done:false}
+ const save=(revision,tasks)=>prepare('INSERT INTO planners VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET revision=excluded.revision,data=excluded.data').run('u',revision,JSON.stringify({spaces:[],tasks}))
+ save(1,[task])
+ const run=createReminderWorker({db,now:()=>clock,env:{RESEND_API_KEY:'test-only',AUTH_FROM:'test@example.com'},send:async()=>{messages++;return {ok:true,json:async()=>({id:'sent'})}}})
+ prepare('INSERT INTO reminder_settings VALUES(?,?,?)').run('u',1,'Asia/Manila')
+ await run();await run();await run()
+ assert.equal(reads,1);assert.equal(messages,1)
+ save(2,[task,{...task,id:'next',title:'Report'}])
+ await run();await run()
+ assert.equal(reads,2);assert.equal(messages,2)
+ save(3,[{...task,id:'next',title:'Report',done:true},{...task,id:'late',title:'Slides'}])
+ await run();assert.equal(reads,3);assert.equal(messages,3)
+ prepare('DELETE FROM planners WHERE user_id=?').run('u')
+ await run();assert.equal(reads,3);assert.equal(messages,3)
+ db.close()
+})

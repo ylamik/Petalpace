@@ -1,3 +1,4 @@
+import type { TaskFile } from '../taskFiles'
 import { taskIdentity, deadlineInstant } from '../deadlineZone'
 import TimePicker from './TimePicker'
 import PlannerSelect from '../../../components/ui/PlannerSelect'
@@ -24,7 +25,7 @@ export type TaskDraft = {
   dueZone?: string
   notes: string
   steps: string[]
-  files: File[]
+  files: TaskFile[]
   links: string[]
   pinned: boolean
 }
@@ -58,7 +59,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
   const [notes, setNotes] = useState(initialTask?.notes ?? '')
   const [pinned, setPinned] = useState(initialTask?.pinned ?? false)
   const [steps, setSteps] = useState<{ id: string; text: string }[]>(() => (initialTask?.steps ?? []).map((text, index) => ({ id: `initial-${index}`, text })))
-  const [files, setFiles] = useState<File[]>(initialTask?.files ?? [])
+  const [files, setFiles] = useState<TaskFile[]>(initialTask?.files ?? [])
   const [links, setLinks] = useState<string[]>(initialTask?.links ?? [])
   const [linkInput, setLinkInput] = useState('')
   const [error, setError] = useState('')
@@ -150,7 +151,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
   return (
     <dialog ref={dialogRef} aria-labelledby="add-task-heading"
       onCancel={(event) => { event.preventDefault(); requestClose() }}
-      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-[580px] overflow-y-auto overscroll-contain rounded-2xl border border-dark-blue/15 bg-surface p-0 font-serif text-dark-blue shadow-2xl backdrop:bg-black/30 backdrop:backdrop-blur-[2px]">
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-[580px] overflow-y-auto overscroll-contain rounded-2xl border border-dark-blue/15 bg-surface p-0 font-sans text-dark-blue shadow-2xl backdrop:bg-black/30 backdrop:backdrop-blur-[2px]">
       <form onSubmit={submit} className="p-5 sm:p-7">
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 id="add-task-heading" className="text-2xl font-bold">{initialTask ? 'Edit task' : 'Add a task'}</h2>

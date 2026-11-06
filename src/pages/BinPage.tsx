@@ -4,7 +4,6 @@ import { Link } from 'react-router'
 import { useSpaces } from '../features/spaces/spaces'
 import ConfirmTaskDialog from '../features/tasks/components/ConfirmTaskDialog'
 import PlannerSelect from '../components/ui/PlannerSelect'
-import ProfileMenu from '../components/auth/ProfileMenu'
 export default function BinPage(){
   const {trash,spaces,tasks,setTasks,permanentlyDelete,saving}=useSpaces()
   const now=usePlannerClock().getTime()
@@ -24,7 +23,7 @@ export default function BinPage(){
   }
   const action='cursor-pointer min-h-11 rounded-lg border border-blue px-4 py-2 text-sm font-medium text-link hover:bg-lightest-blue disabled:cursor-not-allowed disabled:opacity-50'
   return <div className="min-w-0 text-dark-blue">
-    <header className="mb-6 flex items-start justify-between gap-4"><div><h1 className="text-3xl font-bold">Bin</h1><p className="mt-2 text-base text-gray">Deleted tasks stay here for 30 days. Restore them or delete them forever.</p></div><div className="hidden lg:block"><ProfileMenu/></div></header>
+    <header className="mb-6 flex items-start justify-between gap-4"><div><h1 className="text-3xl font-bold">Bin</h1><p className="mt-2 text-base text-gray">Deleted tasks stay here for 30 days. Restore them or delete them forever.</p></div></header>
     <div className="rounded-xl border border-dark-blue/15 bg-beige/35 p-4">
       <p className="text-sm text-gray">Restoring keeps notes, steps, files, links, and task status. Permanent deletion cannot be undone.</p>
       {missingSpace && <div className="mt-3"><p className="mb-2 text-sm">Some original spaces were deleted. Choose a replacement for those tasks:</p><PlannerSelect label="Replacement space" value={destination} onChange={setDestination} options={[{value:'',label:'Choose a space'},...spaces.map(space=>({value:space.id,label:space.name,color:space.color}))]}/>{!spaces.length && <Link to="/spaces/new" className="mt-2 inline-block text-sm text-link underline">Create a space first</Link>}</div>}

@@ -24,8 +24,8 @@ async function fixture(t, options = {}) {
   await new Promise((resolve, reject) => { server.on('error', reject); server.listen(0, '127.0.0.1', resolve) })
   const stop = async () => { await new Promise(resolve => { server.close(resolve); server.closeAllConnections() }); db.close() }
   t.after(stop)
-  const request = (action, data, cookie = '', requestOrigin = origin) => fetch(`http://127.0.0.1:${server.address().port}/api/auth/${action}`, {
-    method: data === undefined ? 'GET' : 'POST', headers: { Origin: requestOrigin, 'Content-Type': 'application/json', Cookie: cookie }, body: data === undefined ? undefined : JSON.stringify(data),
+  const request = (action, data, cookie = '', requestOrigin = origin, headers = {}) => fetch(`http://127.0.0.1:${server.address().port}/api/auth/${action}`, {
+    method: data === undefined ? 'GET' : 'POST', headers: { Origin: requestOrigin, 'Content-Type': 'application/json', Cookie: cookie, ...headers }, body: data === undefined ? undefined : JSON.stringify(data),
   })
   const token = () => /#token=([a-f0-9]+)/.exec(messages.at(-1).text)[1]
   const signup = (overrides = {}) => request('register', { email, password, name: 'Mikyla', ...overrides })
@@ -113,7 +113,8 @@ test('verification expires and failed email delivery never grants access', async
   assert.equal((await f.request('resend', { email, password })).status, 200)
   assert.notEqual(f.token(), token)
   const failed = await fixture(t, { failEmail: true })
-  assert.equal((await failed.signup()).status, 503)
+  assert.equal((await failed.signup()).status, 200)
+  await new Promise(resolve => setTimeout(resolve, 20))
   assert.equal(failed.db.prepare('SELECT verified FROM users').get().verified, 0)
   assert.equal(failed.db.prepare('SELECT COUNT(*) AS n FROM auth_tokens').get().n, 0)
   assert.equal((await failed.request('login', { email, password })).status, 403)
@@ -127,6 +128,61 @@ test('duplicate signup cannot replace a password; login attempts are limited', a
   assert.equal(f.db.prepare('SELECT password_hash FROM users').get().password_hash, original)
   assert.equal(f.messages.length, 1)
   for (let i = 0; i < 10; i++) assert.equal((await f.request('login', { email, password: 'incorrect password' })).status, 401)
+  assert.equal((await f.request('login', { email, password })).status, 429)
+})
+
+test('wrong passwords from one address do not lock out the owner; a per-email ceiling stops spread guessing', async t => {
+  const f = await fixture(t, { env: { TRUSTED_PROXY: '127.0.0.1' } })
+  await f.signup()
+  f.db.prepare('UPDATE users SET verified = 1').run()
+  const from = (ip, pass) => f.request('login', { email, password: pass }, '', origin, { 'X-Forwarded-For': ip })
+  for (let i = 0; i < 10; i++) assert.equal((await from('203.0.113.1', 'incorrect password')).status, 401)
+  assert.equal((await from('203.0.113.1', password)).status, 429)
+  assert.equal((await from('198.51.100.7', password)).status, 200)
+  // 10 wrong passwords and 1 success count so far; the blocked try did not, so 39 more reach 50.
+  for (let i = 0; i < 39; i++) assert.equal((await from(`203.0.113.${10 + i}`, 'incorrect password')).status, 401)
+  assert.equal((await from('198.51.100.8', password)).status, 429)
+  // Other accounts are untouched.
+  assert.notEqual((await f.request('login', { email: 'someone-else@example.com', password }, '', origin, { 'X-Forwarded-For': '198.51.100.8' })).status, 429)
+})
+
+for (const [label, options] of [['rejected', { failEmail: true }], ['not configured', { env: { RESEND_API_KEY: '' } }]]) {
+  test(`forgot-password and sign-up answer identically for known and unknown emails when email is ${label}`, async t => {
+    const f = await fixture(t, options)
+    const reply = async (action, data) => { const response = await f.request(action, data); return [response.status, await response.json()] }
+    await f.signup()
+    f.db.prepare('UPDATE users SET verified = 1').run()
+    assert.deepEqual(await reply('forgot-password', { email }), await reply('forgot-password', { email: 'nobody@example.com' }))
+    assert.deepEqual(await reply('register', { email, password, name: 'Mikyla' }), await reply('register', { email: 'new-person@example.com', password, name: 'New' }))
+    await new Promise(resolve => setTimeout(resolve, 20))
+    assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM auth_tokens').get().n, 0)
+  })
+}
+
+test('the resend action still reports a delivery failure, because it needs the correct password', async t => {
+  const f = await fixture(t, { failEmail: true })
+  await f.signup()
+  assert.equal((await f.request('resend', { email, password })).status, 503)
+  assert.notEqual((await f.request('resend', { email, password: 'wrong password here' })).status, 503)
+})
+
+test('simultaneous sign-ins wait their turn instead of being rejected', async t => {
+  const f = await fixture(t, { env: { HASH_CONCURRENCY: '1' } })
+  const results = await Promise.all([1, 2, 3].map(i => f.request('login', { email: `qa${i}@example.com`, password: 'wrong-password-123' })))
+  assert.deepEqual(results.map(result => result.status), [401, 401, 401])
+})
+
+test('a full limits table cannot lock out people who have made no failed attempts', async t => {
+  const f = await fixture(t)
+  await f.signup()
+  f.db.prepare('UPDATE users SET verified = 1').run()
+  const insert = f.db.prepare('INSERT INTO auth_limits (key, count, expires) VALUES (?, 1, ?)')
+  f.db.exec('BEGIN')
+  for (let i = 0; i < 12000; i++) insert.run('qa-test:' + i, Date.now() + 3600000)
+  f.db.exec('COMMIT')
+  assert.equal((await f.request('login', { email, password })).status, 200)
+  // Per-account limits still apply with the table full.
+  for (let i = 0; i < 9; i++) assert.equal((await f.request('login', { email, password: 'incorrect password' })).status, 401)
   assert.equal((await f.request('login', { email, password })).status, 429)
 })
 

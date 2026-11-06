@@ -5,13 +5,17 @@ import { Outlet, useLocation } from 'react-router'
 import Sidebar from './Sidebar'
 import ProfileMenu from '../auth/ProfileMenu'
 import { TopProgressBar } from '../ui/PageLoader'
+import ProgressDialog from '../../features/tasks/components/ProgressDialog'
+import AddTaskDialog, { type TaskDraft } from '../../features/tasks/components/AddTaskDialog'
 import { usePageTransition } from '../../hooks/usePageTransition'
 import { useSpaces } from '../../features/spaces/spaces'
 
 export default function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [progressOpen, setProgressOpen] = useState(false)
+  const [newTaskOpen, setNewTaskOpen] = useState(false)
   const transitioning = usePageTransition(400)
-  const { saving, syncing } = useSpaces()
+  const { saving, syncing, tasks, setTasks } = useSpaces()
   const showBar = transitioning || saving || !!syncing
   const location = useLocation()
   const menuRef = useRef<HTMLDialogElement>(null)
@@ -40,6 +44,23 @@ export default function AppLayout() {
     }
   }, [menuOpen])
 
+  // Pressing N anywhere opens a new task, unless the person is typing or a dialog is open.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'n' || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return
+      const target = event.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('dialog[open], [role="dialog"]')) return
+      event.preventDefault()
+      setNewTaskOpen(true)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  function createTask(draft: TaskDraft) {
+    setTasks(current => [...current, { ...draft, id: crypto.randomUUID(), spaceId: '', done: draft.done ?? false, completedSteps: [] }])
+  }
+
   // Scroll to top whenever the route changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -53,18 +74,18 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="min-h-dvh bg-canvas font-serif text-dark-blue lg:flex">
+    <div className="min-h-dvh bg-canvas font-sans text-dark-blue lg:flex">
       {/* Top progress bar — page transitions + planner saves */}
       <TopProgressBar visible={showBar} />
 
       {/* Desktop sidebar */}
-      <div className="sticky top-0 hidden h-dvh shrink-0 lg:block">
-        <Sidebar onScrollTop={scrollToTop} />
+      <div className="sticky top-0 z-40 hidden h-dvh shrink-0 border-r border-dark-blue/5 lg:block">
+        <Sidebar onScrollTop={scrollToTop} onProgress={() => setProgressOpen(true)} onNewTask={() => setNewTaskOpen(true)} />
       </div>
 
       <div ref={mainRef} className="min-w-0 flex-1">
         {/* Mobile and tablet navigation */}
-        <header className="sticky top-0 z-30 border-b border-dark-blue/10 bg-beige lg:hidden">
+        <header className="sticky top-0 z-30 border-b border-dark-blue/10 bg-sidebar lg:hidden">
           <div className="flex items-center justify-between gap-3 px-3 py-2">
             <div className="flex min-w-0 items-center gap-2">
               <button
@@ -80,26 +101,26 @@ export default function AppLayout() {
                   {menuOpen ? <path d="m6 6 12 12M6 18 18 6" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
                 </svg>
               </button>
-              <img src="/images/petalpace-logo.png" alt="Petalpace" className="h-auto w-28 object-contain sm:w-32" />
+              <span className="flex items-center gap-2"><img src="/images/petalpace-mark.png" alt="" className="h-6 w-auto object-contain" /><span className="font-serif text-lg font-semibold">Petalpace</span></span>
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <ThemeControl compact />
-              <ProfileMenu doodle={false} compact />
+              <ProfileMenu />
             </div>
           </div>
 
         </header>
 
-        {menuOpen && <dialog ref={menuRef} id="planner-mobile-menu" aria-label="Navigation" onCancel={() => setMenuOpen(false)} className="fixed inset-x-0 top-0 bottom-auto m-0 h-auto max-h-[85dvh] w-full max-w-full overflow-hidden rounded-b-2xl border-0 bg-beige p-0 text-dark-blue shadow-xl backdrop:bg-black/5 backdrop:backdrop-blur-[1px]">
+        {menuOpen && <dialog ref={menuRef} id="planner-mobile-menu" aria-label="Navigation" onCancel={() => setMenuOpen(false)} className="fixed inset-x-0 top-0 bottom-auto m-0 h-auto max-h-[85dvh] w-full max-w-full overflow-hidden rounded-b-2xl border-0 bg-sidebar p-0 text-dark-blue shadow-xl backdrop:bg-black/5 backdrop:backdrop-blur-[1px]">
           <div className="flex max-h-[85dvh] flex-col">
             <div className="flex shrink-0 items-center gap-3 border-b border-dark-blue/10 px-3 py-2">
               <button autoFocus type="button" onClick={() => setMenuOpen(false)} aria-label="Close navigation" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-surface/50">
                 <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m6 6 12 12M6 18 18 6"/></svg>
               </button>
-              <img src="/images/petalpace-logo.png" alt="Petalpace" className="h-auto w-28 object-contain sm:w-32"/>
+              <span className="flex items-center gap-2"><img src="/images/petalpace-mark.png" alt="" className="h-6 w-auto object-contain" /><span className="font-serif text-lg font-semibold">Petalpace</span></span>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-              <Sidebar compact onNavigate={() => setMenuOpen(false)} onScrollTop={scrollToTop}/>
+              <Sidebar compact onNavigate={() => setMenuOpen(false)} onScrollTop={scrollToTop} onProgress={() => setProgressOpen(true)} onNewTask={() => setNewTaskOpen(true)}/>
             </div>
           </div>
         </dialog>}
@@ -112,6 +133,8 @@ export default function AppLayout() {
           <TaskReminders />
           <Outlet />
         </main>
+        {progressOpen && <ProgressDialog onClose={() => setProgressOpen(false)} />}
+        {newTaskOpen && <AddTaskDialog initialTitle="" canPin={tasks.filter(task => task.pinned).length < 3} onClose={() => setNewTaskOpen(false)} onCreate={createTask} />}
       </div>
     </div>
   )

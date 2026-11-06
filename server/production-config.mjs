@@ -2,7 +2,8 @@ import { isAbsolute } from 'node:path'
 import { isIP } from 'node:net'
 export function validateProductionConfig(env) {
   if (env.NODE_ENV !== 'production') return
-  const missing = ['APP_URL','APP_ORIGINS','DATA_DIR','RESEND_API_KEY','FEEDBACK_FROM','FEEDBACK_TO'].filter(key => !env[key]?.trim())
+  const missing = ['APP_URL','APP_ORIGINS','DATA_DIR','FEEDBACK_FROM','FEEDBACK_TO'].filter(key => !env[key]?.trim())
+  if (!env.RESEND_API_KEY?.trim() && !(env.SMTP_USER?.trim() && env.SMTP_PASS?.trim())) missing.push('RESEND_API_KEY or SMTP_USER and SMTP_PASS')
   if (missing.length) throw new Error(`Missing production settings: ${missing.join(', ')}`)
   if (!isAbsolute(env.DATA_DIR)) throw new Error('DATA_DIR must be an absolute persistent-volume path.')
   const app = new URL(env.APP_URL)

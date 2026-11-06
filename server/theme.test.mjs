@@ -21,6 +21,6 @@ function luminance(hex){const rgb=hex.slice(1).match(/../g).map(v=>parseInt(v,16
 function contrast(a,b){const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)}
 for(const [name,palette] of [['light',light],['dark',dark]])test(`${name} theme primary text and status pairs meet 4.5:1 contrast`,()=>{
   for(const [ink,surface] of [['dark-blue','surface'],['dark-blue','canvas'],['gray','surface'],['gray','beige'],['link','surface'],['red','light-red'],['orange','light-orange'],['done-ink','done-badge'],['done-ink','done-card']])assert.ok(contrast(palette[ink],palette[surface])>=4.5,`${name} ${ink}/${surface}: ${contrast(palette[ink],palette[surface])}`)
-  assert.ok(contrast('#ffffff',palette.blue)>=4.5)
+  assert.ok(contrast(palette['on-blue'],palette.blue)>=4.5)
   assert.ok(contrast('#ffffff',palette.danger)>=4.5)
 })

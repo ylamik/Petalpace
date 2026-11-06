@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createFeedbackServer } from './feedback.mjs'
+import { allowAttempt, createFeedbackServer } from './feedback.mjs'
 
 async function fixture(t, { configured = true, fails = false } = {}) {
   const sent = []
@@ -43,4 +43,14 @@ test('rate limit rejects excess submissions', async (t) => {
   for (let i = 0; i < 5; i++) assert.equal((await post(valid)).status, 200)
   assert.equal((await post(valid)).status, 429)
   assert.equal(sent.length, 5)
+})
+
+test('a full feedback attempt map drops the oldest visitor instead of blocking everyone', () => {
+  const attempts = new Map()
+  for (let i = 0; i < 3; i++) assert.equal(allowAttempt(attempts, 'ip' + i, 0, 3), true)
+  assert.equal(allowAttempt(attempts, 'new visitor', 0, 3), true)
+  assert.equal(attempts.size, 3)
+  assert.equal(attempts.has('ip0'), false)
+  for (let i = 0; i < 4; i++) assert.equal(allowAttempt(attempts, 'new visitor', 0, 3), true)
+  assert.equal(allowAttempt(attempts, 'new visitor', 0, 3), false)
 })

@@ -1,5 +1,7 @@
 import { createReminderSettingsHandler } from './reminders.mjs'
 import { clientIP } from './client-ip.mjs'
+import { createWorkQueue, hashConcurrency } from './work-queue.mjs'
+import { emailReady, mailSender } from './mailer.mjs'
 import { createPlannerHandler } from './planner.mjs'
 import { buildZip } from './zip-builder.mjs'
 import { registerSSE } from './sse-broker.mjs'
@@ -32,7 +34,8 @@ async function checkPassword(password, stored) {
   return timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex')) && !!stored
 }
 
-export function createAuthHandler({ db, env = process.env, send = fetch, now = Date.now }) {
+export function createAuthHandler({ db, env = process.env, send, now = Date.now }) {
+  send ??= mailSender(env)
   const production = env.NODE_ENV === 'production'
   const trustedProxy = env.TRUSTED_PROXY || ''
   const cookieName = production ? '__Host-petalpace' : 'petalpace_session'
@@ -40,12 +43,7 @@ export function createAuthHandler({ db, env = process.env, send = fetch, now = D
   const publicUrl = new URL(env.APP_URL || 'http://localhost:5173')
   if (production && publicUrl.protocol !== 'https:') throw new Error('APP_URL must use HTTPS in production.')
   const origins = (env.APP_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173').split(',').map(x => x.trim())
-  let hashing = 0
-  const runHash = async (work) => {
-    if (hashing >= 2) throw Object.assign(new Error('Please wait a moment and try again.'), { status: 429 })
-    hashing++
-    try { return await work() } finally { hashing-- }
-  }
+  const runHash = createWorkQueue({ concurrency: hashConcurrency(env) })
   const cookie = (value, age) => `${cookieName}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${production ? '; Secure' : ''}`
   const sessionHash = req => {
     const value = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith(cookieName + '='))?.slice(cookieName.length + 1)
@@ -59,13 +57,12 @@ export function createAuthHandler({ db, env = process.env, send = fetch, now = D
   function limit(key, max, period = 15 * 60000) {
     db.prepare('DELETE FROM auth_limits WHERE expires <= ?').run(now())
     const row = db.prepare('SELECT count FROM auth_limits WHERE key = ?').get(key)
-    if (!row && db.prepare('SELECT COUNT(*) AS count FROM auth_limits').get().count >= 10000) throw Object.assign(new Error('Please try again later.'), { status: 429 })
     if ((row?.count || 0) >= max) throw Object.assign(new Error('Too many attempts. Please try again in 15 minutes.'), { status: 429 })
     db.prepare('INSERT INTO auth_limits (key, count, expires) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET count = count + 1').run(key, now() + period)
   }
   async function emailToken(user, purpose) {
     const from = env.AUTH_FROM || env.FEEDBACK_FROM
-    if (!env.RESEND_API_KEY || !from) throw Object.assign(new Error('Account email delivery is not configured yet. Please try again later.'), { status: 503 })
+    if (!emailReady(env) || !from) throw Object.assign(new Error('Account email delivery is not configured yet. Please try again later.'), { status: 503 })
     const token = randomBytes(32).toString('hex')
     const hash = digest(token)
     const route = purpose === 'verify' ? '/verify-email' : '/reset-password'
@@ -88,21 +85,27 @@ export function createAuthHandler({ db, env = process.env, send = fetch, now = D
       throw Object.assign(new Error('We could not send the account email. Please try again later. During local testing, the Resend test sender can only email its account owner.'), { status: 503 })
     }
   }
+  // Forgot-password and sign-up answer the same way for every email, so the send can't
+  // reveal an account through a failure or a slower response. Failures stay in the log.
+  const emailInBackground = (user, purpose) => {
+    emailToken(user, purpose).catch(error => console.error(`Account email (${purpose}) failed: ${error.message}`))
+  }
   const reminderSettings=createReminderSettingsHandler({db,findSession,origins,limit,env})
   const planner = createPlannerHandler({db,findSession,origins,limit,now})
   const collab = createCollabHandler({db,findSession,origins,limit,send,env,now})
   return async function handleAuth(req, res) {
-    if (req.url === '/api/auth/reminders') return reminderSettings(req,res)
-    if (req.url === '/api/auth/planner' || req.url === '/api/auth/planner/version') return planner(req,res)
-    if (req.url?.startsWith('/api/collab/')) {
-      const handled = await collab(req, res)
-      if (handled !== null) return
-    }
     const reply = (status, data, headers = {}) => {
       res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', ...headers })
       res.end(JSON.stringify(data))
     }
     try {
+      // Every route sits inside this try, so a limit or database error keeps its proper status.
+      if (req.url === '/api/auth/reminders') return await reminderSettings(req,res)
+      if (req.url === '/api/auth/planner' || req.url === '/api/auth/planner/version' || req.url?.startsWith('/api/auth/planner/files/')) return await planner(req,res)
+      if (req.url?.startsWith('/api/collab/')) {
+        const handled = await collab(req, res)
+        if (handled !== null) return
+      }
       db.prepare('DELETE FROM sessions WHERE expires <= ?').run(now())
       db.prepare('DELETE FROM auth_tokens WHERE expires <= ?').run(now())
       if ((req.url === '/api/auth/photo' || req.url?.startsWith('/api/auth/photo?')) && req.method === 'GET') {
@@ -156,12 +159,13 @@ export function createAuthHandler({ db, env = process.env, send = fetch, now = D
         const zipEntries = [{ name: 'tasks.csv', data: Buffer.from(csv, 'utf8') }]
         for (const task of (planner.tasks ?? [])) {
           for (const file of (task.files ?? [])) {
-            if (!file.name || !file.data) continue
+            const stored = db.prepare('SELECT data FROM planner_files WHERE id = ? AND user_id = ?').get(file.id, user.id)
+            if (!file.name || !stored) continue
             // Sanitise the task title so it's safe as a folder name
             const folder = task.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim().slice(0, 60) || task.id
             zipEntries.push({
               name: `files/${folder}-${String(task.id).replace(/[^a-zA-Z0-9_-]/g,'_')}/${(task.files ?? []).indexOf(file)}-${file.name.replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')}`, 
-              data: Buffer.from(file.data, 'base64'),
+              data: Buffer.from(stored.data),
             })
           }
         }
@@ -256,10 +260,13 @@ export function createAuthHandler({ db, env = process.env, send = fetch, now = D
       }
       const email = typeof data.email === 'string' ? data.email.trim().toLowerCase() : ''
       if (!validEmail(email)) return reply(400, { error: 'Enter a valid email address.' })
-      limit(`${action}:${digest(email)}`, action === 'login' ? 10 : 3)
+      // Login counts per email and IP first, so one attacker can't lock the real user out.
+      // The wider per-email ceiling still stops guessing spread across many addresses.
+      if (action === 'login') limit(`login:${digest(email)}:${digest(ip)}`, 10)
+      limit(`${action}:${digest(email)}`, action === 'login' ? 50 : 3)
       const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email)
       if (action === 'forgot-password') {
-        if (user) await emailToken(user, 'reset')
+        if (user) emailInBackground(user, 'reset')
         return reply(200, { ok: true, message: 'If this email has an account, a password reset link will arrive shortly.' })
       }
       const password = data.password
@@ -271,7 +278,7 @@ export function createAuthHandler({ db, env = process.env, send = fetch, now = D
         // INSERT OR IGNORE also handles concurrent requests for the same email.
         db.prepare('INSERT OR IGNORE INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)').run(randomUUID(), email, name, passwordHash)
         const account = db.prepare('SELECT * FROM users WHERE email = ?').get(email)
-        if (!account.verified && await runHash(() => checkPassword(password, account.password_hash))) await emailToken(account, 'verify')
+        if (!account.verified && await runHash(() => checkPassword(password, account.password_hash))) emailInBackground(account, 'verify')
         return reply(200, { ok: true, message: 'If this address is available, check your inbox for a verification link. Already registered? Sign in or reset your password.' })
       }
       const matches = await runHash(() => checkPassword(password, user?.password_hash))
@@ -289,6 +296,7 @@ export function createAuthHandler({ db, env = process.env, send = fetch, now = D
       db.prepare('INSERT INTO sessions (hash, user_id, expires) VALUES (?, ?, ?)').run(digest(token), user.id, now() + 7 * DAY)
       return reply(200, { user: userView(user) }, { 'Set-Cookie': cookie(token, 7 * 86400) })
     } catch (error) {
+      if (res.headersSent) return res.destroy()
       return reply(error.status || 500, { error: error.status ? error.message : 'Something went wrong. Please try again.' })
     }
   }

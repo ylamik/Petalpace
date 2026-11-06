@@ -64,7 +64,7 @@ test('authenticated SSE opens once and broadcasts without duplicate headers',asy
  try{assert.match(new TextDecoder().decode((await reader.read()).value),/planner-changed/)}finally{clearTimeout(timeout);abort.abort();await reader.cancel().catch(()=>{})}
 })
 
-test('delegated resources persist, editors edit unassigned work, limited members change only their status',async t=>{
+test('delegated resources persist, editors edit unassigned work, limited members edit only their own steps',async t=>{
  const f=await fixture(t);let task=await f.create();const path='/api/collab/tasks/'+task.id
  f.db.prepare('INSERT INTO collab_members VALUES(?,?,?,?)').run(task.id,'u1','editor',Date.now())
  f.db.prepare('INSERT INTO collab_members VALUES(?,?,?,?)').run(task.id,'u2','steps',Date.now())
@@ -72,8 +72,9 @@ test('delegated resources persist, editors edit unassigned work, limited members
  assert.equal(result.status,200,JSON.stringify(result.body));task=result.body.task
  assert.equal(task.subtasks[0].notes,'Brief');assert.deepEqual(task.subtasks[0].links,['https://example.com/source'])
  const edit=patch=>f.request(path,'PUT',{revision:task.revision,...patch},2)
- assert.equal((await edit({subtasks:task.subtasks.map(s=>({...s,notes:'unauthorized'}))})).status,403)
- assert.equal((await edit({subtasks:task.subtasks.map(s=>({...s,links:['https://example.com/other']}))})).status,403)
+ assert.equal((await edit({subtasks:task.subtasks.map(s=>({...s,title:'Renamed'}))})).status,403)
+ result=await edit({subtasks:task.subtasks.map(s=>({...s,notes:'My progress',links:['https://example.com/mine']}))});assert.equal(result.status,200);task=result.body.task
+ assert.equal(task.subtasks[0].notes,'My progress');assert.deepEqual(task.subtasks[0].links,['https://example.com/mine'])
  assert.equal((await edit({files:[]})).status,403)
  result=await edit({subtasks:task.subtasks.map(s=>({...s,done:true}))});assert.equal(result.status,200);task=result.body.task
  const sharp=(await import('sharp')).default
@@ -84,9 +85,55 @@ test('delegated resources persist, editors edit unassigned work, limited members
  assert.equal(result.status,200,JSON.stringify(result.body));task=result.body.task
  const saved=(await f.request(path,'GET',undefined,2)).body.task
  assert.equal(saved.files[0].subtaskId,task.subtasks[0].id)
- assert.equal(saved.subtasks[0].notes,'Brief');assert.equal(saved.links[0].url,'https://example.com/group')
+ assert.equal(saved.subtasks[0].notes,'My progress');assert.equal(saved.links[0].url,'https://example.com/group')
  assert.equal((await f.request(path,'PUT',{revision:task.revision,subtasks:task.subtasks.map(s=>({...s,links:['javascript:alert(1)']}))},1)).status,400)
  result=await f.request(path,'PUT',{revision:task.revision,subtasks:[]},1)
  assert.equal(result.status,200);assert.equal(result.body.task.files.length,0);assert.equal(result.body.task.links.length,1)
  assert.equal((await f.request(path+'/members/u2','PATCH',{permission:'editor'},1)).status,403)
+})
+test('rate limits and database errors on reminder and shared task routes return proper JSON errors',async t=>{
+ const f=await fixture(t);const task=await f.create();const zone='Asia/Manila'
+ for(let i=0;i<30;i++)assert.equal((await f.request('/api/auth/reminders','POST',{enabled:false,zone})).status,200)
+ const locked=await f.request('/api/auth/reminders','POST',{enabled:false,zone})
+ assert.equal(locked.status,429);assert.equal(locked.body.error,'Too many attempts. Please try again in 15 minutes.')
+ assert.equal((await f.request('/api/auth/reminders','POST',{enabled:false,zone},1)).status,200)
+ for(let i=0;i<20;i++)assert.notEqual((await f.request(`/api/collab/tasks/${task.id}/invite`,'POST',{email:`person${i}@example.com`,permission:'steps'})).status,429)
+ const invite=await f.request(`/api/collab/tasks/${task.id}/invite`,'POST',{email:'one-more@example.com',permission:'steps'})
+ assert.equal(invite.status,429);assert.equal(invite.body.error,'Too many attempts. Please try again in 15 minutes.')
+ f.db.exec('DROP TABLE collab_files')
+ const broken=await f.request(`/api/collab/tasks/${task.id}`,'GET',undefined,0)
+ assert.equal(broken.status,500);assert.equal(broken.body.error,'Something went wrong. Please try again.')
+})
+test('shared task timezones default to the owner, and only the owner can change them',async t=>{
+ const f=await fixture(t);const body={title:'No zone',priority:'Medium',color:'#D7E7FD',dueDate:'2026-11-30',dueTime:'09:00'}
+ const first=await f.request('/api/collab/tasks','POST',body);assert.equal(first.status,200);assert.equal(first.body.task.dueZone,'UTC')
+ assert.equal((await f.request('/api/auth/reminders','POST',{enabled:false,zone:'Europe/Paris'})).status,200)
+ const second=await f.request('/api/collab/tasks','POST',{...body,title:'Reminder zone'});assert.equal(second.body.task.dueZone,'Europe/Paris')
+ const third=await f.request('/api/collab/tasks','POST',{...body,title:'Own zone',dueZone:'Asia/Tokyo'});assert.equal(third.body.task.dueZone,'Asia/Tokyo')
+ const path='/api/collab/tasks/'+third.body.task.id
+ f.db.prepare('INSERT INTO collab_members (task_id,user_id,role,joined_at) VALUES (?,?,?,?)').run(third.body.task.id,'u1','editor',1)
+ const denied=await f.request(path,'PUT',{revision:0,dueZone:'Europe/Paris'},1)
+ assert.equal(denied.status,403);assert.equal(denied.body.error,'Only the task owner can change the timezone.')
+ assert.equal((await f.request(path,'PUT',{revision:0,notes:'editor note',dueZone:'Asia/Tokyo'},1)).status,200)
+ assert.equal((await f.request(path,'PUT',{revision:1,dueZone:'Not/AZone'})).status,400)
+ const changed=await f.request(path,'PUT',{revision:1,dueZone:'America/New_York'})
+ assert.equal(changed.status,200);assert.equal(changed.body.task.dueZone,'America/New_York')
+ assert.equal((await f.request(path,'PUT',{revision:2,notes:'zone stays'})).body.task.dueZone,'America/New_York')
+})
+test('each permission level can do exactly what it allows',async t=>{
+ const f=await fixture(t);let task=await f.create();const path='/api/collab/tasks/'+task.id
+ f.db.prepare('INSERT INTO collab_members VALUES(?,?,?,?)').run(task.id,'u1','steps',Date.now())
+ f.db.prepare('INSERT INTO collab_members VALUES(?,?,?,?)').run(task.id,'u2','viewer',Date.now())
+ let result=await f.request(path,'PUT',{revision:task.revision,subtasks:[{title:'Mine',done:false,assignedTo:'u1'},{title:'Theirs',done:false,assignedTo:'u0'}]})
+ assert.equal(result.status,200);task=result.body.task
+ const as=(user,patch)=>f.request(path,'PUT',{revision:task.revision,...patch},user)
+ const step=(i,change)=>task.subtasks.map((s,j)=>j===i?{...s,...change}:s)
+ // Limited member: own step only, nothing on the task itself.
+ for(const patch of [{title:'New title'},{notes:'Task notes'},{priority:'Low'},{subtasks:step(1,{done:true})},{subtasks:step(1,{notes:'x'})},{subtasks:step(0,{assignedTo:'u0'})}])assert.equal((await as(1,patch)).status,403,JSON.stringify(patch))
+ result=await as(1,{subtasks:step(0,{done:true,notes:'Done my part'})});assert.equal(result.status,200);task=result.body.task
+ // Viewer: can read, can't change anything.
+ assert.equal((await f.request(path,'GET',undefined,2)).status,200)
+ for(const patch of [{subtasks:task.subtasks},{notes:'x'}])assert.equal((await as(2,patch)).status,403)
+ // Someone who isn't a member can't even read it.
+ assert.equal((await f.request(path,'GET',undefined,1).then(()=>f.db.prepare('DELETE FROM collab_members WHERE user_id=?').run('u2')).then(()=>f.request(path,'GET',undefined,2))).status,403)
 })

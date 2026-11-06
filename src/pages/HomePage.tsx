@@ -178,7 +178,7 @@ export default function HomePage() {
 
   return (
     <div
-      className="min-h-dvh w-full bg-surface font-serif text-dark-blue"
+      className="min-h-dvh w-full bg-surface font-sans text-dark-blue"
       id="top"
     >
       {/* Navigation */}
@@ -292,7 +292,7 @@ export default function HomePage() {
             >
               <h1
                 id="hero-title"
-                className="font-serif leading-[1.05] tracking-tight"
+                className="font-sans leading-[1.05] tracking-tight"
               >
                 <span className="block text-[clamp(2.1rem,5vw,4.25rem)] font-bold">
                   Small steps.

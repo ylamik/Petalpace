@@ -32,7 +32,7 @@ The heatmap shows completion dates in the user's browser time zone. Marking Done
 Profile circles use the first and last name initials (one or two letters). Users can change/remove their photo and sign out from the circle menu. Photos accept static JPG/PNG/WebP up to 2 MB and 4096 × 4096 pixels. The server validates signatures, fully decodes and re-encodes to a 512 × 512 WebP with metadata stripped, and stores it in the private database. Photo reads and writes require a session and always use that session's user ID, not a client-provided account ID. `npm run test:profile` checks malformed uploads and cross-account access.
 
 - All account queries bind parameters rather than inserting user strings into SQL.
-- Passwords use salted scrypt (N=131072, r=8, p=1); comparison is timing-safe. Concurrent hashing is bounded.
+- Passwords use salted scrypt (N=131072, r=8, p=1); comparison is timing-safe. Concurrent hashing is bounded by CPU and memory, and extra requests queue briefly. Set `HASH_CONCURRENCY` (1–16) to override.
 - Sessions use random 256-bit tokens in HttpOnly, SameSite=Lax cookies, with a seven-day expiry. The database stores only token hashes. Logout deletes the session; password reset deletes all sessions for that user.
 - Email verification and reset links use random 256-bit tokens, expire in 30 minutes, and are consumed once. Tokens are in the URL fragment, not a query string. Opening a link alone does not consume it.
 - Login uses a generic incorrect-email-or-password message. Requests have body limits, IP/account throttling, trusted-origin checks and JSON-only POSTs. Session endpoints disable caching.

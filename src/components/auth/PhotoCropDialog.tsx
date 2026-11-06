@@ -54,7 +54,7 @@ export default function PhotoCropDialog({ file, onCancel, onSave }: Props) {
     finally { setSaving(false) }
   }
   return <>
-    <dialog ref={dialog} aria-labelledby="photo-crop-title" onCancel={event => { event.preventDefault(); if (!saving) onCancel() }} className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-[460px] overflow-y-auto rounded-2xl border border-dark-blue/15 bg-surface p-0 font-serif text-dark-blue shadow-xl backdrop:bg-black/30">
+    <dialog ref={dialog} aria-labelledby="photo-crop-title" onCancel={event => { event.preventDefault(); if (!saving) onCancel() }} className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-[460px] overflow-y-auto rounded-2xl border border-dark-blue/15 bg-surface p-0 font-sans text-dark-blue shadow-xl backdrop:bg-black/30">
       <header className="border-b border-dark-blue/10 bg-beige/60 px-5 py-4"><h2 id="photo-crop-title" className="text-2xl font-semibold">Make it your little space</h2><p className="mt-1 text-sm text-gray">Drag your photo and adjust the zoom to fit the circle.</p></header>
       <div className="p-5">
         <div className="relative mx-auto aspect-square w-full max-w-[260px] touch-none overflow-hidden rounded-full border-2 border-blue/40 bg-beige/40" style={{cursor: source ? 'grab' : 'default'}}

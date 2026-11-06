@@ -1,14 +1,13 @@
 import { useEffect } from 'react'
 import { applyTheme, subscribeTheme } from './features/theme/theme'
-import CalendarPage from './pages/CalendarPage'
 import BinPage from './pages/BinPage'
-import { BrowserRouter, Route, Routes } from 'react-router'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
 import AppLayout from './components/layout/AppLayout'
 import HomePage from './pages/HomePage'
 import SigninPage from './pages/SigninPage'
 import SignupPage from './pages/SignupPage'
 import TodayPage from './pages/TodayPage'
-import UpcomingPage from './pages/UpcomingPage'
+import PlannerPage from './pages/PlannerPage'
 import AllTasksPage from './pages/AllTasksPage'
 import SpacePage from './pages/SpacePage'
 import CreateSpacePage from './pages/CreateSpacePage'
@@ -20,10 +19,18 @@ import CollaborationPage from './pages/CollaborationPage'
 import CollabTaskPage from './pages/CollabTaskPage'
 import CollabJoinPage from './pages/CollabJoinPage'
 
+// Re-applies the theme on navigation, so public pages switch to light and app pages back.
+function ThemeForRoute() {
+  const { pathname } = useLocation()
+  useEffect(() => { applyTheme() }, [pathname])
+  return null
+}
+
 export default function App() {
   useEffect(()=>{applyTheme();return subscribeTheme(()=>{})},[])
   return (
     <BrowserRouter>
+      <ThemeForRoute />
       <AuthProvider>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -39,9 +46,10 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="/spaces/new" element={<CreateSpacePage />} />
               <Route path="/today" element={<TodayPage />} />
-              <Route path="/upcoming" element={<UpcomingPage />} />
+              <Route path="/planner" element={<PlannerPage />} />
+              <Route path="/upcoming" element={<Navigate to="/planner" replace />} />
               <Route path="/tasks" element={<AllTasksPage />} />
-              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/calendar" element={<Navigate to="/planner?view=month" replace />} />
               <Route path="/bin" element={<BinPage />} />
               <Route path="/spaces/:spaceId" element={<SpacePage />} />
               <Route path="/collaboration" element={<CollaborationPage />} />

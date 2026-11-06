@@ -1,3 +1,4 @@
+import { isStoredFile, storedFileUrl, type TaskFile } from '../taskFiles'
 import { taskIdentity, deadlineInstant } from '../deadlineZone'
 import TimePicker from './TimePicker'
 import PlannerSelect from '../../../components/ui/PlannerSelect'
@@ -30,14 +31,15 @@ type Props = {
 }
 const field = 'mt-1 block min-h-11 w-full min-w-0 rounded border border-dark-blue/20 bg-surface px-3 text-base focus-visible:outline-blue'
 
-function FileDownload({ file }: { file: File }) {
+function FileDownload({ file }: { file: TaskFile }) {
   const anchorRef = useRef<HTMLAnchorElement>(null)
   useEffect(() => {
+    if (isStoredFile(file)) return
     const objectUrl = URL.createObjectURL(file)
     if (anchorRef.current) anchorRef.current.href = objectUrl
     return () => URL.revokeObjectURL(objectUrl)
   }, [file])
-  return <a ref={anchorRef} download={file.name} aria-label={`Download ${file.name}`} className="flex h-11 w-10 shrink-0 items-center justify-center rounded text-link hover:bg-lightest-blue/30 focus-visible:outline-blue">⇩</a>
+  return <a ref={anchorRef} href={isStoredFile(file) ? storedFileUrl(file) : undefined} download={file.name} aria-label={`Download ${file.name}`} className="flex h-11 w-10 shrink-0 items-center justify-center rounded text-link hover:bg-lightest-blue/30 focus-visible:outline-blue">⇩</a>
 }
 
 export default function TaskDetailsPanel({ task: originalTask, onChange: commitChanges, onClose, onDelete, spaceOptions: providedSpaces }: Props) {
@@ -110,7 +112,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
   return (
     <dialog ref={dialogRef} aria-labelledby="task-detail-title" onCancel={event => { event.preventDefault(); requestClose() }}
       onClick={(event) => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) requestClose() } }}
-      className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-[420px] overflow-y-auto border-0 bg-surface p-0 font-serif text-dark-blue shadow-[-8px_0_30px_rgb(0_0_0_/_0.08)] backdrop:bg-black/15">
+      className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-[420px] overflow-y-auto border-0 bg-surface p-0 font-sans text-dark-blue shadow-[-8px_0_30px_rgb(0_0_0_/_0.08)] backdrop:bg-black/15">
       <div className="flex min-h-full flex-col px-6 pt-4 sm:px-7">
         <header>
           <div className="flex items-center justify-between gap-2">

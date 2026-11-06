@@ -70,7 +70,7 @@ export default function EditSpaceDialog({
       ref={dialogRef}
       aria-labelledby="edit-space-title"
       onCancel={(e) => { e.preventDefault(); onCancel() }}
-      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-[480px] overflow-y-auto rounded-2xl border border-dark-blue/15 bg-surface p-0 font-serif text-dark-blue shadow-xl backdrop:bg-black/30"
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-[480px] overflow-y-auto rounded-2xl border border-dark-blue/15 bg-surface p-0 font-sans text-dark-blue shadow-xl backdrop:bg-black/30"
     >
       <header className="flex items-center gap-3 border-b border-dark-blue/10 bg-beige/60 px-5 py-4">
         <span

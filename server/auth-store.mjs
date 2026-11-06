@@ -21,6 +21,7 @@ export function createAuthStore(path = ':memory:') {
     CREATE TABLE IF NOT EXISTS auth_limits (
       key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS auth_limits_expires ON auth_limits(expires);
     CREATE TABLE IF NOT EXISTS profile_photos (
       user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       image BLOB NOT NULL, version TEXT NOT NULL
@@ -82,7 +83,7 @@ export function createAuthStore(path = ':memory:') {
   // Additive migrations preserve existing accounts and shared work.
   for(const [table,column,definition] of [
     ['collab_tasks','revision','INTEGER NOT NULL DEFAULT 0'],
-    ['collab_tasks','due_zone',"TEXT NOT NULL DEFAULT 'Asia/Manila'"],
+    ['collab_tasks','due_zone',"TEXT NOT NULL DEFAULT 'UTC'"],
     ['collab_tasks','assigned_to','TEXT'],
     ['collab_invites','permission',"TEXT NOT NULL DEFAULT 'steps'"],
     ['collab_files','subtask_id','TEXT'],

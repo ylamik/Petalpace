@@ -17,7 +17,11 @@ const TASK_GROUPS = [['done', 'started', 'blocked', 'pinned'], ['space', 'spaceI
 export const PIN_LIMIT = 3
 
 function canonical(value: unknown): unknown {
-  if (typeof File !== 'undefined' && value instanceof File) return { file: [value.name, value.size, value.lastModified, value.type] }
+  // A file picked in this tab and the same file reloaded from the server compare equal.
+  if (value && typeof value === 'object' && 'lastModified' in value && 'size' in value) {
+    const file = value as { name: string; size: number; lastModified: number; type: string }
+    return { file: [file.name, file.size, file.lastModified, file.type] }
+  }
   if (Array.isArray(value)) return value.map(canonical)
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([k, v]) => [k, canonical(v)]))

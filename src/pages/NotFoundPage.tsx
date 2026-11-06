@@ -6,7 +6,7 @@ export default function NotFoundPage() {
   const navigate = useNavigate()
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center bg-page px-6 py-12 font-serif text-dark-blue">
+    <main className="flex min-h-dvh flex-col items-center justify-center bg-page px-6 py-12 font-sans text-dark-blue">
       {/* Decorative petals */}
       <img
         src="/images/petal.png"

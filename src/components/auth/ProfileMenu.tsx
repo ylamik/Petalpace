@@ -6,6 +6,7 @@ import { useSpaces } from '../../features/spaces/spaces'
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { accountRequest, useAuth } from '../../features/auth/auth'
+import ThemeControl from '../ui/ThemeControl'
 
 function initials(name: string) {
   const words = name.trim().split(/\s+/).map(word => word.match(/\p{L}/u)?.[0]).filter(Boolean)
@@ -13,7 +14,7 @@ function initials(name: string) {
   return Array.from(letters.toLocaleUpperCase()).slice(0, 2).join('')
 }
 
-export default function ProfileMenu({ doodle = true, compact = false }: { doodle?: boolean; compact?: boolean }) {
+export default function ProfileMenu({ variant = 'avatar' }: { variant?: 'avatar' | 'sidebar' }) {
   const { user, refresh, logout } = useAuth()
   const {ensureSaved}=useSpaces()
   const navigate = useNavigate()
@@ -21,6 +22,7 @@ export default function ProfileMenu({ doodle = true, compact = false }: { doodle
   const [cropFile, setCropFile] = useState<File | null>(null)
   const [confirmation, setConfirmation] = useState<'remove' | 'reset' | 'logout' | null>(null)
   const [remindersOpen,setRemindersOpen]=useState(false)
+  const [reminders,setReminders]=useState<{enabled:boolean;zone:string}|null>(null)
   const [dataAction, setDataAction] = useState<'export' | 'delete' | null>(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -39,6 +41,30 @@ export default function ProfileMenu({ doodle = true, compact = false }: { doodle
     document.addEventListener('keydown', escape)
     return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
   }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    let alive = true
+    fetch('/api/auth/reminders')
+      .then(response => response.ok ? response.json() : null)
+      .then(data => { if (alive && data) setReminders({ enabled: !!data.enabled, zone: data.zone || Intl.DateTimeFormat().resolvedOptions().timeZone }) })
+      .catch(() => { /* The switch stays hidden if preferences can't load. */ })
+    return () => { alive = false }
+  }, [open])
+
+  async function toggleReminders() {
+    if (!reminders) return
+    const previous = reminders
+    const next = { ...reminders, enabled: !reminders.enabled }
+    setReminders(next)
+    try {
+      const response = await fetch('/api/auth/reminders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) })
+      if (!response.ok) throw new Error((await response.json().catch(() => null))?.error)
+    } catch (error) {
+      setReminders(previous)
+      setNotice(error instanceof Error && error.message ? error.message : 'Could not save your reminder preference.')
+    }
+  }
 
   function changePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -80,28 +106,44 @@ export default function ProfileMenu({ doodle = true, compact = false }: { doodle
   }
   if (!user) return null
   const hasPhoto = !!user.photoUrl && failedPhoto !== user.photoUrl
-  return <div ref={root} className="relative shrink-0" onBlur={event => {
+  const sidebar = variant === 'sidebar'
+  const item = 'flex min-h-9 w-full cursor-pointer items-center rounded-lg px-2 text-left text-[0.9375rem] hover:bg-beige disabled:opacity-60'
+  const avatar = (size: string, text: string) => <span className={`${size} ${text} relative flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#FF686C] font-semibold text-white`}>
+    {hasPhoto ? <img src={user.photoUrl!} alt="" className="h-full w-full object-cover" onError={() => setFailedPhoto(user.photoUrl!)} /> : initials(user.name)}
+  </span>
+  return <div ref={root} className={sidebar ? 'relative min-w-0 flex-1' : 'relative shrink-0'} onBlur={event => {
     if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false)
   }}>
-    {doodle && <img src="/images/thin-doodle.png" alt="" aria-hidden="true" className="pointer-events-none absolute -top-6 -right-4 h-11 w-11 object-contain" />}
-    <button ref={trigger} type="button" aria-label={`Profile for ${user.name}`} aria-expanded={open} aria-controls={menuId} aria-haspopup="dialog" onClick={() => setOpen(value => !value)} className={`${compact ? "h-9 w-9 text-base" : "h-11 w-11 text-xl"} relative flex items-center justify-center overflow-hidden rounded-full border border-dark-blue bg-[#FF686C] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue`}>
-      {hasPhoto ? <img src={user.photoUrl!} alt="" className="h-full w-full object-cover" onError={() => setFailedPhoto(user.photoUrl!)} /> : initials(user.name)}
+    <button ref={trigger} type="button" aria-label={`Profile for ${user.name}`} aria-expanded={open} aria-controls={menuId} aria-haspopup="dialog" onClick={() => setOpen(value => !value)} className={sidebar ? 'flex min-h-12 w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-xl px-1.5 text-left hover:bg-nav-active focus-visible:outline-2 focus-visible:outline-blue' : 'flex cursor-pointer rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue'}>
+      {avatar('h-9 w-9', 'text-base')}
+      {sidebar && <span className="min-w-0"><span className="block truncate text-[0.9375rem] font-semibold leading-tight">{user.name}</span><span className="block truncate text-xs text-gray">Account &amp; settings</span></span>}
     </button>
-    {open && <div id={menuId} role="dialog" aria-label="Your profile" className="absolute right-0 top-full z-50 mt-3 w-[min(280px,calc(100vw-2.5rem))] rounded-xl border border-dark-blue/15 bg-surface p-4 text-dark-blue shadow-[0_4px_14px_rgb(0_0_0_/_0.15)]">
-      <div className="mb-3 border-b border-dark-blue/10 pb-3">
-        <p className="text-xs uppercase tracking-wider text-gray">Your little space</p>
-        <p className="mt-1 break-words text-lg font-semibold">{user.name}</p>
-        <p className="break-all text-xs text-gray">{user.email}</p>
+    {open && <div id={menuId} role="dialog" aria-label="Your profile" className={`absolute z-50 w-[min(276px,calc(100vw-2.5rem))] rounded-2xl border border-dark-blue/10 bg-surface p-4 text-dark-blue shadow-[0_8px_30px_rgb(0_0_0_/_0.18)] ${sidebar ? 'bottom-full left-0 mb-2' : 'right-0 top-full mt-3'}`}>
+      <div className="mb-3 flex items-center gap-3">
+        {avatar('h-11 w-11', 'text-lg')}
+        <div className="min-w-0">
+          <p className="break-words font-serif text-lg font-semibold leading-tight">{user.name}</p>
+          <p className="break-all text-sm text-gray">{user.email}</p>
+        </div>
       </div>
       <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose profile photo" className="hidden" onChange={event => void changePhoto(event)} />
-      <button ref={firstAction} disabled={busy} type="button" onClick={() => fileInput.current?.click()} className="min-h-11 w-full rounded-md bg-lightest-blue/60 px-3 py-2 text-left text-sm font-semibold hover:bg-lightest-blue disabled:opacity-60">{user.photoUrl ? 'Change profile photo' : 'Add profile photo'}</button>
-
-      {user.photoUrl && <button type="button" disabled={busy} onClick={() => ask('remove')} className="mt-1 min-h-10 w-full rounded px-3 py-2 text-left text-sm text-link hover:bg-lightest-blue/30 disabled:opacity-60">Remove photo</button>}
-      <button type="button" disabled={busy} onClick={() => ask('reset')} className="mt-2 flex min-h-10 w-full items-center rounded px-3 text-sm hover:bg-beige/60">Reset password</button>
-      <button type="button" onClick={()=>{setOpen(false);setRemindersOpen(true)}} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-beige">Email reminders</button>
-          <button type="button" disabled={busy} onClick={()=>{setOpen(false);setDataAction('export')}} className="mt-1 min-h-10 w-full rounded px-3 text-left text-sm hover:bg-beige/60">Export my data</button>
-      <button type="button" disabled={busy} onClick={()=>{setOpen(false);setDataAction('delete')}} className="mt-1 min-h-10 w-full rounded px-3 text-left text-sm text-red hover:bg-light-pink">Delete account</button>
-      <div className="mt-2 border-t border-dark-blue/10 pt-2"><button type="button" disabled={busy} onClick={() => ask('logout')} className="min-h-11 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-red hover:bg-light-pink disabled:opacity-60">Sign out</button></div>
+      <ThemeControl />
+      <div className="mt-3 border-t border-dark-blue/10 pt-2">
+        <button ref={firstAction} disabled={busy} type="button" onClick={() => fileInput.current?.click()} className={item}>{user.photoUrl ? 'Change profile photo' : 'Add profile photo'}</button>
+        {user.photoUrl && <button type="button" disabled={busy} onClick={() => ask('remove')} className={item}>Remove photo</button>}
+        <div className="flex min-h-9 items-center gap-2 rounded-lg hover:bg-beige">
+          <button type="button" onClick={() => { setOpen(false); setRemindersOpen(true) }} className={`${item} min-w-0 flex-1 hover:bg-transparent`}>Email reminders</button>
+          {reminders && <button type="button" role="switch" aria-checked={reminders.enabled} aria-label="Send email reminders" onClick={() => void toggleReminders()} className={`relative mr-2 h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue ${reminders.enabled ? 'bg-blue' : 'bg-light-gray'}`}>
+            <span aria-hidden="true" className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-[left] ${reminders.enabled ? 'left-[18px]' : 'left-0.5'}`} />
+          </button>}
+        </div>
+        <button type="button" disabled={busy} onClick={() => ask('reset')} className={item}>Reset password</button>
+        <button type="button" disabled={busy} onClick={() => { setOpen(false); setDataAction('export') }} className={`${item} justify-between`}>Export my data<span className="text-xs text-gray">ZIP</span></button>
+      </div>
+      <div className="mt-2 border-t border-dark-blue/10 pt-2">
+        <button type="button" disabled={busy} onClick={() => ask('logout')} className={`${item} font-semibold`}>Sign out</button>
+        <button type="button" disabled={busy} onClick={() => { setOpen(false); setDataAction('delete') }} className={`${item} text-sm text-red`}>Delete account</button>
+      </div>
       {notice && <p role="status" className="mt-2 text-sm leading-relaxed">{notice}</p>}
     </div>}
     {dataAction && <AccountDataDialog mode={dataAction} onClose={()=>{setDataAction(null);setOpen(true)}}/>}

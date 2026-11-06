@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { emailReady, mailSender } from './mailer.mjs'
 import { deadlineInstant, validZone } from '../src/features/tasks/deadlineZone.ts'
 export function setupReminders(db){db.exec(`CREATE TABLE IF NOT EXISTS reminder_settings(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,enabled INTEGER NOT NULL DEFAULT 0,zone TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS reminder_deliveries(key TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,payload TEXT NOT NULL,created_at INTEGER NOT NULL,next_try INTEGER NOT NULL,sent_at INTEGER,attempts INTEGER NOT NULL DEFAULT 0);`)}
@@ -16,18 +17,34 @@ export function reminderPhase(task,now,zone){
 }
 // Persistent phase receipts prevent repeats after restarts. A single-server
 // worker scans once a minute and sends at most 20 messages in one pass.
-export function createReminderWorker({db,env=process.env,send=fetch,now=Date.now}){
+export function createReminderWorker({db,env=process.env,send,now=Date.now}){
+ send??=mailSender(env)
  setupReminders(db);let busy=false
+ // A planner is parsed only when its revision changes, and only tasks that can
+ // still need a reminder are kept, so idle scans never touch the planner JSON.
+ const deadlines=new Map()
+ const deadlineTasks=user=>{
+  const revision=db.prepare('SELECT revision FROM planners WHERE user_id=?').get(user)?.revision
+  if(revision===undefined){deadlines.delete(user);return []}
+  const cached=deadlines.get(user)
+  if(cached?.revision===revision)return cached.tasks
+  const tasks=JSON.parse(db.prepare('SELECT data FROM planners WHERE user_id=?').get(user).data).tasks
+   .filter(task=>task.dueDate && !task.done && !task.started && !task.blocked)
+   .map(({id,title,dueDate,dueTime,dueZone})=>({id,title,dueDate,dueTime,dueZone}))
+  deadlines.set(user,{revision,tasks})
+  return tasks
+ }
  return async()=>{
-  if(busy || !env.RESEND_API_KEY || !(env.AUTH_FROM || env.FEEDBACK_FROM))return
+  if(busy || !emailReady(env) || !(env.AUTH_FROM || env.FEEDBACK_FROM))return
   busy=true
   try{
    const settings=db.prepare('SELECT r.*,u.email FROM reminder_settings r JOIN users u ON u.id=r.user_id WHERE r.enabled=1 AND u.verified=1').all()
+   const active=new Set(settings.map(setting=>setting.user_id))
+   for(const user of deadlines.keys())if(!active.has(user))deadlines.delete(user)
    let budget=20
    for(const setting of settings){
     if(budget<=0)break
-    const row=db.prepare('SELECT data FROM planners WHERE user_id=?').get(setting.user_id)
-    const tasks=row?JSON.parse(row.data).tasks:[]
+    const tasks=deadlineTasks(setting.user_id)
     const shared=db.prepare('SELECT c.* FROM collab_tasks c JOIN collab_members m ON m.task_id=c.id WHERE m.user_id=?').all(setting.user_id).map(t=>({id:'shared:'+t.id,title:t.title,dueDate:t.due_date,dueTime:t.due_time,dueZone:t.due_zone,done:t.status==='done',started:t.status==='progress',blocked:t.status==='blocked'}))
     for(const task of [...tasks,...shared]){
      const phase=reminderPhase(task,now(),setting.zone)
@@ -65,7 +82,7 @@ export function createReminderSettingsHandler({db,findSession,origins,limit,env=
  return async(req,res)=>{
   const reply=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data))}
   const user=findSession(req);if(!user)return reply(401,{error:'Please sign in.'})
-  if(req.method==='GET'){const row=db.prepare('SELECT * FROM reminder_settings WHERE user_id=?').get(user.id);return reply(200,{enabled:!!row?.enabled,zone:row?.zone || '',ready:!!(env.RESEND_API_KEY && (env.AUTH_FROM || env.FEEDBACK_FROM))})}
+  if(req.method==='GET'){const row=db.prepare('SELECT * FROM reminder_settings WHERE user_id=?').get(user.id);return reply(200,{enabled:!!row?.enabled,zone:row?.zone || '',ready:emailReady(env) && !!(env.AUTH_FROM || env.FEEDBACK_FROM)})}
   if(req.method!=='POST')return reply(405,{error:'Use POST.'})
   if(!origins.includes(req.headers.origin))return reply(403,{error:'Please use Petalpace.'})
   limit('reminders:'+user.id,30)

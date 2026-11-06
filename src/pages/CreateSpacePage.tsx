@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useSpaces } from '../features/spaces/spaces'
-import ProfileMenu from '../components/auth/ProfileMenu'
 
 const palette = ['#BCDCF1', '#EBC39C', '#D0BEFF', '#F9DEA4', '#BFD2C8', '#FFACB3']
 export default function CreateSpacePage() {
@@ -11,7 +10,7 @@ export default function CreateSpacePage() {
   const [color, setColor] = useState(palette[0])
   const [custom, setCustom] = useState('')
   const [error, setError] = useState('')
-  return <><div className="mb-4 hidden justify-end lg:flex"><ProfileMenu /></div><section className="mx-auto mt-3 max-w-[620px] rounded-lg border border-dark-blue/15 bg-surface p-6 text-dark-blue shadow-[0_3px_3px_rgb(0_0_0_/_0.12)] sm:p-10">
+  return <><section className="mx-auto mt-3 max-w-[620px] rounded-lg border border-dark-blue/15 bg-surface p-6 text-dark-blue shadow-[0_3px_3px_rgb(0_0_0_/_0.12)] sm:p-10">
     <h1 className="mb-3 text-3xl font-bold">A space for what matters</h1>
     <form onSubmit={(event) => {
       event.preventDefault()

@@ -182,6 +182,7 @@ An activity heatmap recording each day you completed tasks.
 - Sessions stored as SHA-256 hashes only (raw token never persisted)
 - Email tokens single-use, 30-minute expiry, consumed atomically in a transaction
 - Rate limiting per IP (auth, feedback, photo endpoints)
+- Login limits per email and IP (10 in 15 minutes) with a per-email ceiling (50 in 15 minutes)
 - Proxy-aware rate limiting via `TRUSTED_PROXY` env var
 - Profile photos decoded and re-encoded by Sharp (strips metadata, rejects corrupt/animated files)
 - Document uploads validated by magic bytes (PDF, OLE2, OOXML signatures)
@@ -301,7 +302,7 @@ Sign up with a real address on your live domain and confirm that verification, p
 ## Known limitations
 
 - **Reminders are in-page only** — no push notifications or background workers. Reminders do not fire while the browser tab is closed.
-- **Whole-planner saves** — every edit uploads the full planner including attachments. Performance may degrade for accounts with many large file attachments.
+- **Whole-planner saves** — every edit uploads the full task list. Existing attachments are sent as references, and files download only when opened.
 - **Deadlines follow device local time** — no fixed-timezone scheduling. A task's due date may shift if you travel and your device timezone changes.
 - **No recurring tasks or offline drafts** — unsaved changes are lost if the browser tab is closed before a save completes.
 

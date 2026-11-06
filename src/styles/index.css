@@ -1,11 +1,13 @@
-@import url("https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Story+Script&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,500&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --color-canvas: #ffffff;
+  --color-canvas: #fbfaf7;
   --color-surface: #ffffff;
-  --color-page: #faf7ef;
+  --color-page: #fbfaf7;
+  --color-sidebar: #f7eee9;
+  --color-nav-active: #dfe9f3;
+  --color-on-blue: #ffffff;
   --color-link: #4c74a1;
   --color-action-hover: #2f3c74;
   --color-danger: #b12b26;
@@ -32,8 +34,10 @@
   --color-light-gray: #e0e2dc;
   --color-gray: #5f5f5f;
 
-  --font-serif: "STIX Two Text", Georgia, serif;
-  --font-story: "Story Script", cursive;
+  /* Body and controls use the sans; headings and task titles use the serif. */
+  --font-sans: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", Georgia, serif;
+  --font-story: "Source Serif 4", Georgia, serif;
 }
 
 /* Keep page width steady when a modal locks scrolling. */
@@ -45,7 +49,14 @@ body {
   margin: 0;
   background: var(--color-canvas);
   color: var(--color-dark-blue);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
+}
+
+/* In the base layer, so a font-sans class on a heading still wins. */
+@layer base {
+  h1, h2, h3 {
+    font-family: var(--font-serif);
+  }
 }
 
 /* Clip the petals to the hero and allow clicks through them. */
@@ -148,37 +159,47 @@ select { appearance: none; padding-right: 2.5rem !important; background-image: u
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-canvas: #151e29;
-  --color-surface: #202c3a;
-  --color-page: #18232e;
-  --color-dark-blue: #e5eaf3;
-  --color-link: #abcdf4;
-  --color-action-hover: #365c85;
-  --color-beige: #2d3032;
-  --color-lightest-blue: #354d68;
+  --color-canvas: #181b20;
+  --color-surface: #1f222b;
+  --color-page: #181b20;
+  --color-sidebar: #1b1e23;
+  --color-nav-active: #2b3743;
+  --color-dark-blue: #ece7dd;
+  --color-blue: #91aecc;
+  --color-on-blue: #15181d;
+  --color-link: #9dbde0;
+  --color-action-hover: #a9c2dc;
+  --color-beige: #2b2e34;
+  --color-lightest-blue: #2b3743;
   --color-light-blue: #accfff;
-  --color-light-pink: #403033;
-  --color-light-yellow: #3c3729;
-  --color-light-green: #2c3c34;
-  --color-light-red: #4d3035;
-  --color-red: #ffb4a8;
-  --color-light-orange: #493b28;
-  --color-orange: #f4ca83;
-  --color-light-gray: #363e47;
-  --color-gray: #b9c2ce;
-  --color-panel-blue: #24354a;
-  --color-panel-green: #303e36;
-  --color-done-card: #293f34;
-  --color-done-hover: #35523f;
-  --color-done-badge: #375b43;
-  --color-done-ink: #c5e8ca;
-  --color-done-stroke: #87b394;
-  --color-star: #e9cf73;
-  --heat-0: #303c37;
-  --heat-1: #455e46;
-  --heat-2: #5b7955;
-  --heat-3: #7a9c6f;
-  --heat-4: #accb9c;
+  --color-light-pink: #3a2b2e;
+  --color-light-yellow: #3a3226;
+  --color-light-green: #28332c;
+  --color-light-red: #4a2f2e;
+  --color-red: #f2a99b;
+  --color-light-orange: #412e1f;
+  --color-orange: #eebd84;
+  --color-light-gray: #2c3038;
+  --color-gray: #a9abae;
+  --color-panel-blue: #222a35;
+  --color-panel-green: #2a332d;
+  --color-done-card: #26332b;
+  --color-done-hover: #2f4136;
+  --color-done-badge: #2f4a38;
+  --color-done-ink: #b9dcc0;
+  --color-done-stroke: #7ea88a;
+  --color-star: #e9c46a;
+  --heat-0: #2a2d35;
+  --heat-1: #3f4a58;
+  --heat-2: #5b6b7e;
+  --heat-3: #7a93ae;
+  --heat-4: #a3bedb;
+}
+/* The dark primary is a light blue, so its label flips to dark ink. */
+:root[data-theme="dark"] .bg-blue.text-white,
+:root[data-theme="dark"] .hover\:bg-action-hover.text-white,
+:root[data-theme="dark"] .hover\:bg-blue.hover\:text-white:hover {
+  color: var(--color-on-blue);
 }
 :root[data-theme="dark"] select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E5EAF3' stroke-width='1.8'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
@@ -193,6 +214,7 @@ select { appearance: none; padding-right: 2.5rem !important; background-image: u
   --color-gray: #5f5f5f;
   --color-page: #faf7ef;
   --color-surface: #fffcf8;
+  --color-panel-green: #e6eadd;
   color: #2f3c74;
 }
 :root[data-theme="dark"] .paper-art img[src^="/icons/"] { filter: none; }

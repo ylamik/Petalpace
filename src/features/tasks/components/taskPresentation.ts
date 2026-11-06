@@ -34,6 +34,7 @@ export function matchesDeadline(task: {dueDate?: string; dueTime?:string;dueZone
   if (filter === 'overdue') return isDeadlineOverdue(task)
   if (filter === 'soon') return days !== null && days >= 0 && days <= 3
   if (filter === 'week') return days !== null && days >= 0 && days <= 7
+  if (filter === 'month') return days !== null && days >= 0 && days <= 30
   return true
 }
 export function compareTasks(a: {title: string; priority: string; dueDate?: string; dueTime?:string;dueZone?:string; dueToday?: boolean}, b: typeof a, sort: string) {

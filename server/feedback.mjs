@@ -6,6 +6,7 @@ import { join, extname, normalize, sep } from 'node:path'
 const emailPattern = /^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/
 
 import { clientIP } from './client-ip.mjs'
+import { emailReady, mailSender } from './mailer.mjs'
 export { clientIP } from './client-ip.mjs'
 
 const mimeTypes = {
@@ -71,7 +72,18 @@ async function serveStatic(req, res, staticDir) {
   }
 }
 
-export function createFeedbackServer({ env = process.env, send = fetch, auth, staticDir, checkHealth = () => true } = {}) {
+// The map stays bounded by dropping the oldest visitor, so a flood of addresses can't block everyone.
+export function allowAttempt(attempts, ip, now, cap = 10000) {
+  const window = attempts.get(ip) ?? { count: 0, until: now + 600000 }
+  if (window.count >= 5) return false
+  if (!attempts.has(ip) && attempts.size >= cap) attempts.delete(attempts.keys().next().value)
+  window.count++
+  attempts.set(ip, window)
+  return true
+}
+
+export function createFeedbackServer({ env = process.env, send, auth, staticDir, checkHealth = () => true } = {}) {
+  send ??= mailSender(env)
   const attempts = new Map()
   const trustedProxy = env.TRUSTED_PROXY || ''
   const spaDir = staticDir || null
@@ -99,9 +111,7 @@ export function createFeedbackServer({ env = process.env, send = fetch, auth, st
       const now = Date.now()
       for (const [key, value] of attempts) if (value.until <= now) attempts.delete(key)
       const ip = clientIP(req, trustedProxy)
-      const window = attempts.get(ip) ?? { count: 0, until: now + 600000 }
-      if (window.count >= 5 || attempts.size >= 10000) return reply(429, { error: 'Too many submissions. Please try again in 10 minutes.' })
-      window.count++; attempts.set(ip, window)
+      if (!allowAttempt(attempts, ip, now)) return reply(429, { error: 'Too many submissions. Please try again in 10 minutes.' })
       try {
         let body = ''
         for await (const chunk of req) {
@@ -116,7 +126,7 @@ export function createFeedbackServer({ env = process.env, send = fetch, auth, st
         if (!['Suggestion', 'Report a bug', 'Something else'].includes(feedbackType) || typeof message !== 'string' || !message.trim() || message.length > 5000 || typeof email !== 'string' || email.length > 254 || (email.trim() && !emailPattern.test(email.trim()))) {
           return reply(400, { error: 'Choose a feedback type, write up to 5,000 characters, and check your email if provided.' })
         }
-        if (!env.RESEND_API_KEY || !env.FEEDBACK_FROM || !emailPattern.test(env.FEEDBACK_TO || '')) return reply(503, { error: 'Feedback delivery is not ready yet. Please use the contact email below.' })
+        if (!emailReady(env) || !env.FEEDBACK_FROM || !emailPattern.test(env.FEEDBACK_TO || '')) return reply(503, { error: 'Feedback delivery is not ready yet. Please use the contact email below.' })
         const result = await send('https://api.resend.com/emails', {
           method: 'POST', headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ from: env.FEEDBACK_FROM, to: [env.FEEDBACK_TO], subject: `Petalpace feedback: ${feedbackType}`, text: `Type: ${feedbackType}\nReply email: ${email.trim() || 'Not provided'}\n\n${message.trim()}`, ...(email.trim() ? { reply_to: email.trim() } : {}) }),

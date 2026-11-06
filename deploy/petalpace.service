@@ -1,0 +1,21 @@
+[Unit]
+Description=Petalpace Node.js server
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=petalpace
+WorkingDirectory=/opt/petalpace
+ExecStart=/usr/bin/node server/index.mjs
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=petalpace
+
+# Load environment variables from .env.local
+EnvironmentFile=/opt/petalpace/.env.local
+
+[Install]
+WantedBy=multi-user.target

@@ -8,7 +8,7 @@ import { emailLayout } from './reminders.mjs'
  * Permissions:
  *   owner  — full control (create, edit all fields, manage members, delete)
  *   editor — edits task content and assignments, not membership or deletion
- *   steps/member — only toggles completion of assigned steps
+ *   steps/member — edits notes, links and completion of their assigned steps only
  *   viewer — read/download only
  *
  * All routes are under /api/collab/
@@ -16,6 +16,7 @@ import { emailLayout } from './reminders.mjs'
 
 import { randomBytes, createHash } from 'node:crypto'
 import { notifyPlannerChanged } from './sse-broker.mjs'
+import { emailReady, mailSender } from './mailer.mjs'
 
 const digest = v => createHash('sha256').update(v).digest('hex')
 const text = (s, n) => typeof s === 'string' && s.length <= n
@@ -60,7 +61,13 @@ function taskView(db, task) {
   }
 }
 
-export function createCollabHandler({ db, findSession, origins, limit, send = fetch, env = process.env, now = Date.now }) {
+export function createCollabHandler({ db, findSession, origins, limit, send, env = process.env, now = Date.now }) {
+  send ??= mailSender(env)
+  // Used when a request has no timezone: the owner's reminder zone, or UTC.
+  const defaultZone = userId => {
+    const zone = db.prepare('SELECT zone FROM reminder_settings WHERE user_id = ?').get(userId)?.zone
+    return validZone(zone) ? zone : 'UTC'
+  }
   const reply = (res, status, data) => {
     res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
     res.end(JSON.stringify(data))
@@ -78,7 +85,7 @@ export function createCollabHandler({ db, findSession, origins, limit, send = fe
 
   async function sendInviteEmail(task, inviteeEmail, inviterName, token) {
     const from = env.AUTH_FROM || env.FEEDBACK_FROM
-    if (!env.RESEND_API_KEY || !from) throw Object.assign(new Error('Invite email is not configured. Please try again later.'),{status:503})
+    if (!emailReady(env) || !from) throw Object.assign(new Error('Invite email is not configured. Please try again later.'),{status:503})
     const publicUrl = new URL(env.APP_URL || 'http://localhost:5173')
     const link = new URL('/collaboration/join', publicUrl)
     link.hash = `token=${token}`
@@ -125,7 +132,8 @@ export function createCollabHandler({ db, findSession, origins, limit, send = fe
       if (!['High', 'Medium', 'Low'].includes(data.priority)) return reply(res, 400, { error: 'Choose a priority.' })
       if (!/^#[0-9a-f]{6}$/i.test(data.color || '')) return reply(res, 400, { error: 'Use a valid hex color.' })
       if((data.dueDate!==undefined && typeof data.dueDate!=='string') || (data.dueTime!==undefined && typeof data.dueTime!=='string'))return reply(res,400,{error:'Choose a valid date and time.'})
-      if(!text(data.notes || '',20000) || (data.dueDate && deadlineInstant(data.dueDate,data.dueTime,data.dueZone || 'Asia/Manila')===null) || (data.dueTime && !data.dueDate) || (data.dueZone && !validZone(data.dueZone))) return reply(res,400,{error:'Check your notes and deadline.'})
+      const dueZone=data.dueZone || defaultZone(user.id)
+      if(!text(data.notes || '',20000) || (data.dueDate && deadlineInstant(data.dueDate,data.dueTime,dueZone)===null) || (data.dueTime && !data.dueDate) || (data.dueZone && !validZone(data.dueZone))) return reply(res,400,{error:'Check your notes and deadline.'})
       if(db.prepare('SELECT COUNT(*) AS n FROM collab_tasks WHERE owner_id=?').get(user.id).n>=100)return reply(res,400,{error:'Up to 100 shared tasks per owner.'})
       if(!findSession(req))return reply(res,401,{error:'Please sign in.'})
       if(db.prepare('SELECT title,priority,due_date,due_time FROM collab_tasks WHERE owner_id=?').all(user.id).some(t=>t.title.trim().toLowerCase()===title.toLowerCase() && t.priority===data.priority && t.due_date===(data.dueDate || '') && t.due_time===(data.dueTime || '')))return reply(res,400,{error:'This shared task already exists. Change the title, priority or deadline.'})
@@ -135,7 +143,7 @@ export function createCollabHandler({ db, findSession, origins, limit, send = fe
       try {
         db.prepare('INSERT INTO collab_tasks (id, owner_id, title, notes, priority, due_date, due_time, status, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, user.id, title, data.notes || '', data.priority, data.dueDate || '', data.dueTime || '', 'todo', data.color, ts, ts)
         db.prepare('INSERT INTO collab_members (task_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)').run(id, user.id, 'owner', ts)
-        db.prepare('UPDATE collab_tasks SET due_zone=? WHERE id=?').run(data.dueZone || 'Asia/Manila',id)
+        db.prepare('UPDATE collab_tasks SET due_zone=? WHERE id=?').run(dueZone,id)
         db.exec('COMMIT')
       } catch (err) { db.exec('ROLLBACK'); throw err }
       notifyPlannerChanged(`collab:${user.id}`)
@@ -184,12 +192,13 @@ export function createCollabHandler({ db, findSession, origins, limit, send = fe
         if(freshMember.role!=='steps' && freshMember.role!=='member')return reply(res,403,{error:'You have view-only access.'})
         if(Object.keys(data).some(k=>!['revision','subtasks'].includes(k)))return reply(res,403,{error:'You can only update your assigned steps.'})
         const oldSteps=db.prepare('SELECT * FROM collab_subtasks WHERE task_id=? ORDER BY position').all(task.id)
-        if(!Array.isArray(data.subtasks) || data.subtasks.length!==oldSteps.length || data.subtasks.some((step,i)=>{const old=oldSteps[i];return !step || step.id!==old.id || step.title!==old.title || (step.notes ?? old.notes)!==old.notes || JSON.stringify(step.links ?? JSON.parse(old.links))!==old.links || (step.assignedTo || null)!==old.assigned_to || (Boolean(step.done)!==Boolean(old.done) && old.assigned_to!==user.id)}))return reply(res,403,{error:'Only completion of your assigned steps can be changed.'})
+        if(!Array.isArray(data.subtasks) || data.subtasks.length!==oldSteps.length || data.subtasks.some((step,i)=>{const old=oldSteps[i];return !step || step.id!==old.id || step.title!==old.title || (step.assignedTo || null)!==old.assigned_to || (old.assigned_to!==user.id && ((step.notes ?? old.notes)!==old.notes || JSON.stringify(step.links ?? JSON.parse(old.links))!==old.links || Boolean(step.done)!==Boolean(old.done)))}))return reply(res,403,{error:'You can only update the notes, links and completion of your assigned steps.'})
       }
       if(data.assignedTo!==undefined && data.assignedTo!==null && typeof data.assignedTo!=='string')return reply(res,400,{error:'Choose a member to assign.'})
       if(data.assignedTo && !db.prepare('SELECT 1 FROM collab_members WHERE task_id=? AND user_id=?').get(task.id,data.assignedTo))return reply(res,400,{error:'Assign this task to a member.'})
       const dueDate=data.dueDate ?? freshTask.due_date, dueTime=data.dueTime ?? freshTask.due_time, dueZone=data.dueZone ?? freshTask.due_zone
       if(typeof dueDate!=='string' || typeof dueTime!=='string' || !validZone(dueZone) || (dueDate && deadlineInstant(dueDate,dueTime,dueZone)===null) || (dueTime && !dueDate))return reply(res,400,{error:'Choose a valid deadline and timezone.'})
+      if(!isOwner && dueZone!==freshTask.due_zone)return reply(res,403,{error:'Only the task owner can change the timezone.'})
       // Fields only the owner can change
       if (!editor && (data.title !== undefined || data.priority !== undefined || data.dueDate !== undefined || data.dueTime !== undefined || data.color !== undefined)) {
         return reply(res, 403, { error: 'Only the task owner can edit the title, priority, deadline, and color.' })

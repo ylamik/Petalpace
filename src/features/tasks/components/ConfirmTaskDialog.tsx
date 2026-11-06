@@ -29,7 +29,7 @@ export default function ConfirmTaskDialog({ title, message, confirmLabel, cancel
       aria-labelledby={id}
       aria-describedby={`${id}-message`}
       onCancel={event => { event.preventDefault(); onCancel() }}
-      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-[420px] overflow-y-auto overscroll-contain rounded-2xl border border-dark-blue/15 bg-surface p-0 font-serif text-dark-blue shadow-xl backdrop:bg-black/30 backdrop:backdrop-blur-[2px]"
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-[420px] overflow-y-auto overscroll-contain rounded-2xl border border-dark-blue/15 bg-surface p-0 font-sans text-dark-blue shadow-xl backdrop:bg-black/30 backdrop:backdrop-blur-[2px]"
     >
       <div className="flex items-center justify-between border-b border-dark-blue/10 bg-beige/60 px-5 py-3 sm:px-6">
         <span aria-hidden="true" className={`flex h-9 w-9 items-center justify-center rounded-full ${destructive ? 'bg-light-red text-red' : 'bg-lightest-blue text-link'}`}>

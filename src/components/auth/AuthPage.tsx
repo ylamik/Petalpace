@@ -68,7 +68,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
   if (user && (mode === 'sign-in' || isSignUp)) return <Navigate to={afterSignIn} replace />
 
   return (
-    <main className="min-h-dvh bg-page font-serif text-dark-blue md:flex md:items-center md:justify-center md:p-6 lg:p-10">
+    <main className="min-h-dvh bg-page font-sans text-dark-blue md:flex md:items-center md:justify-center md:p-6 lg:p-10">
       <div className="mx-auto grid w-full max-w-[1000px] overflow-hidden bg-surface md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:rounded-xl md:border md:border-dark-blue/10 md:shadow-sm">
         {/* Shared illustration panel */}
         <aside className="relative min-w-0 overflow-hidden bg-beige px-6 py-6 sm:px-10 md:flex md:flex-col md:py-10">
