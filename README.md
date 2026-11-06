@@ -30,16 +30,15 @@ The public landing page. Explains what Petalpace is and lets visitors sign up or
 ### Sign up / Sign in
 Secure account registration with email verification. Password reset is handled by a single-use email link (expires in 30 minutes).
 
-<img width="596" height="418" alt="image" src="https://github.com/user-attachments/assets/cfc92a7e-8f9a-4a1b-bfd0-cba6de598865" />
-
+<img width="672" height="436" alt="image" src="https://github.com/user-attachments/assets/431b8067-139b-4e2d-b6a7-5b88c0efbfe1" />
 
 ---
 
 ### Today
 Your daily view. Shows tasks due today, overdue unfinished tasks, and undated unfinished tasks. Pinned tasks appear in **My top 3** at the top for quick focus.
 
-<img width="959" height="472" alt="image" src="https://github.com/user-attachments/assets/eb841354-5961-4ebb-9bc9-ebb68e5c1434" />
-<img width="957" height="470" alt="image" src="https://github.com/user-attachments/assets/2394a289-3c3e-4706-a704-319416e237d4" />
+<img width="956" height="471" alt="image" src="https://github.com/user-attachments/assets/291192a3-3657-49af-b54a-06fbb9b1efb1" />
+<img width="953" height="467" alt="image" src="https://github.com/user-attachments/assets/e258ab02-ffa7-4f2a-8770-41b79fc577aa" />
 
 
 - Quick-add bar to create a task in seconds
@@ -49,10 +48,13 @@ Your daily view. Shows tasks due today, overdue unfinished tasks, and undated un
 
 ---
 
-### Upcoming
+### Planner
 All tasks with a future deadline, grouped by date on a timeline. Missed deadlines and completed tasks have collapsible sections.
 
-<img width="959" height="471" alt="image" src="https://github.com/user-attachments/assets/888dccac-3c36-464a-a7e4-fdd8dff367ee" />
+<img width="958" height="472" alt="image" src="https://github.com/user-attachments/assets/7cb494a4-9874-453a-8904-f715293eff90" />
+<img width="956" height="470" alt="image" src="https://github.com/user-attachments/assets/e3fb8dea-f5ee-4989-8b63-9048be9b6c83" />
+<img width="959" height="473" alt="image" src="https://github.com/user-attachments/assets/019566b6-7576-4f96-b93a-29f4069a9ca9" />
+<img width="958" height="473" alt="image" src="https://github.com/user-attachments/assets/7ee408dd-1642-4e00-bc5e-a4d76e31cbf1" />
 
 - Filter by space, status, deadline range, or search by title
 - "Tasks ahead" sidebar counts unfinished tasks per space
@@ -63,7 +65,7 @@ All tasks with a future deadline, grouped by date on a timeline. Missed deadline
 ### All Tasks
 Every task across all spaces in one filterable list, with the mountains illustration beside the header.
 
-<img width="959" height="473" alt="image" src="https://github.com/user-attachments/assets/3e5f7095-3d43-4e4f-8aa8-a27575ca1486" />
+<img width="956" height="473" alt="image" src="https://github.com/user-attachments/assets/dbfae3aa-8c2e-41db-adc4-f6c297fd8679" />
 
 - Filter by space, status, priority, or deadline
 - Sort by nearest deadline, farthest, priority, or title A–Z
@@ -75,8 +77,7 @@ Every task across all spaces in one filterable list, with the mountains illustra
 ### Calendar
 A full calendar showing tasks on their due dates. Supports month, week, day, and year views.
 
-<img width="959" height="472" alt="image" src="https://github.com/user-attachments/assets/e492189c-67d6-43e8-a7ac-49f9d46b8d35" />
-<img width="959" height="470" alt="image" src="https://github.com/user-attachments/assets/760b0e1e-69f1-4ece-a372-979352b596c1" />
+<img width="955" height="468" alt="image" src="https://github.com/user-attachments/assets/7fcce510-47e7-46f9-bf93-9462b7a7aace" />
 
 - Click any date to drill into day view
 - Click `+` on a date to add a task with that due date pre-filled
@@ -88,8 +89,9 @@ A full calendar showing tasks on their due dates. Supports month, week, day, and
 ### Spaces
 Tasks are organised into spaces — named and coloured categories you define (new accounts start with School and Personal; add Work, Health, or anything that fits your life). Each space has its own page.
 
-<img width="958" height="468" alt="image" src="https://github.com/user-attachments/assets/87465c44-5080-496d-b05f-7dc04a6daac9" />
-<img width="959" height="472" alt="image" src="https://github.com/user-attachments/assets/f2baa8ec-6af2-4aae-814d-533f086d3f0c" />
+<img width="956" height="472" alt="image" src="https://github.com/user-attachments/assets/bc59f6a0-2702-4420-92c4-d4adbaf37d99" />
+<img width="953" height="470" alt="image" src="https://github.com/user-attachments/assets/1042f4b6-2645-436f-9b22-7784606779f0" />
+<img width="945" height="469" alt="image" src="https://github.com/user-attachments/assets/8bbb0664-3f95-48ed-a862-79a46f06c3c2" />
 
 - Create a space with a name and colour from the palette or a custom hex
 - **Edit** a space's name or colour at any time — pencil icon appears on hover in the sidebar, or use the "Edit space" button on the space page
@@ -102,9 +104,8 @@ Tasks are organised into spaces — named and coloured categories you define (ne
 ### Task details
 Opening any task slides open a detail panel on the right.
 
-<img width="958" height="472" alt="image" src="https://github.com/user-attachments/assets/5504051c-aa4f-4f73-9ca3-1d0f4a8838ae" />
-<img width="958" height="476" alt="image" src="https://github.com/user-attachments/assets/5b22e08f-3fa0-4f0c-b664-7482332dc9e2" />
-
+<img width="950" height="473" alt="image" src="https://github.com/user-attachments/assets/19c6785b-b88b-47a6-bff5-f6ad561346f1" />
+<img width="948" height="471" alt="image" src="https://github.com/user-attachments/assets/986b30fc-b72f-4fd7-b4ac-f70db0bd0105" />
 
 Everything you can store on a task:
 - Title (up to 160 characters) — warns if a duplicate title already exists
@@ -122,7 +123,7 @@ Everything you can store on a task:
 ### Bin
 Deleted tasks are kept for 30 days before permanent removal.
 
-<img width="959" height="451" alt="image" src="https://github.com/user-attachments/assets/22048be3-3f02-4884-87c0-1c69b06fbd9b" />
+<img width="958" height="473" alt="image" src="https://github.com/user-attachments/assets/074f3690-d79f-462c-b8ee-4a8e0eda2683" />
 
 - Restore a task to its original space (or choose a replacement if the space was deleted)
 - Select multiple tasks to restore or permanently delete together
@@ -133,7 +134,8 @@ Deleted tasks are kept for 30 days before permanent removal.
 ### Progress (heatmap)
 An activity heatmap recording each day you completed tasks.
 
-<img width="954" height="455" alt="image" src="https://github.com/user-attachments/assets/fe605b66-0647-400f-b399-7f79b67b55a2" />
+<img width="944" height="472" alt="image" src="https://github.com/user-attachments/assets/31084540-5b05-4297-83d0-654170a42322" />
+<img width="943" height="474" alt="image" src="https://github.com/user-attachments/assets/f982b183-ccb1-47e5-814d-4ccc6ee08bb2" />
 
 - 4-week, 12-week, and 26-week range views
 - Colour intensity reflects how many tasks you completed that day
@@ -144,6 +146,11 @@ An activity heatmap recording each day you completed tasks.
 
 ### Shared tasks
 Work on a task together with other Petalpace users.
+
+<img width="957" height="469" alt="image" src="https://github.com/user-attachments/assets/84f65511-c6c0-4c5b-987d-6b583f34ed87" />
+<img width="954" height="469" alt="image" src="https://github.com/user-attachments/assets/7807aabc-0e37-4d9b-8598-447d7c1d2e57" />
+<img width="959" height="470" alt="image" src="https://github.com/user-attachments/assets/e6876fe2-1178-47ca-85f9-b3a07a225ef1" />
+<img width="957" height="468" alt="image" src="https://github.com/user-attachments/assets/2346b54a-8b16-48a0-8382-1b6ded436fbb" />
 
 - **Delegated tasks** — split the work into items, assign each to a member, and track it with a status: To do, In progress, Done, or Blocked. Every status change asks for confirmation
 - Each item has its own notes, links and files, plus group resources for the whole task
