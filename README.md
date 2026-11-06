@@ -86,7 +86,7 @@ A full calendar showing tasks on their due dates. Supports month, week, day, and
 ---
 
 ### Spaces
-Tasks are organised into spaces — named and coloured categories you define (Work, Personal, Creative, Health, or anything that fits your life). Each space has its own page.
+Tasks are organised into spaces — named and coloured categories you define (new accounts start with School and Personal; add Work, Health, or anything that fits your life). Each space has its own page.
 
 <img width="958" height="468" alt="image" src="https://github.com/user-attachments/assets/87465c44-5080-496d-b05f-7dc04a6daac9" />
 <img width="959" height="472" alt="image" src="https://github.com/user-attachments/assets/f2baa8ec-6af2-4aae-814d-533f086d3f0c" />
@@ -142,6 +142,26 @@ An activity heatmap recording each day you completed tasks.
 
 ---
 
+### Shared tasks
+Work on a task together with other Petalpace users.
+
+- **Delegated tasks** — split the work into items, assign each to a member, and track it with a status: To do, In progress, Done, or Blocked. Every status change asks for confirmation
+- Each item has its own notes, links and files, plus group resources for the whole task
+- **Invite several people at once** by email, each with their own access:
+
+| Access | What they can do |
+|---|---|
+| Owner | Everything, including managing members and deleting the task |
+| Edit all content | Change anything in the task, except members and deletion |
+| Assigned items only | Update the status, notes and links of items assigned to them |
+| View only | Read and download |
+
+- Access is checked on the server, not just hidden in the page
+- Changes appear live for every member
+- The owner sets the deadline timezone; each member also sees the deadline in their own time
+
+---
+
 ## Features
 
 ### Accounts
@@ -166,7 +186,9 @@ An activity heatmap recording each day you completed tasks.
 - Steps, links, file attachments, priority, status, deadline (date + optional time)
 - Deadline labels turn red within 3 days of due date
 - Missed deadlines group for overdue unfinished tasks
-- Gentle in-page reminder dialog for To-do tasks due within 3 days (snoozable for 1 hour)
+- Gentle in-page reminder dialog for tasks that are overdue or due soon (snoozable for 1 hour)
+- Optional reminder emails, sent by the server even when the site is closed
+- Deadlines keep the timezone they were saved in, and show your own local time when it differs
 - **Duplicate title detection** — warns when a task with the same title already exists, but lets you proceed if the details differ
 - File magic-byte validation — checks actual file content, not just the extension
 
@@ -217,7 +239,7 @@ An activity heatmap recording each day you completed tasks.
 
 ### Prerequisites
 - Node.js 22+
-- A [Resend](https://resend.com) account for email (sign-up verification, password reset, feedback)
+- A Gmail account with an app password (or a [Resend](https://resend.com) account) for email: sign-up verification, password reset, reminders, invites and feedback
 
 ### Setup
 
@@ -227,7 +249,7 @@ npm install
 
 # 2. Copy environment config
 cp .env.example .env.local
-# Fill in RESEND_API_KEY, FEEDBACK_FROM, FEEDBACK_TO in .env.local
+# Fill in SMTP_USER and SMTP_PASS (Gmail app password), FEEDBACK_FROM and FEEDBACK_TO
 
 # 3. Start dev server (API on :3001, Vite on :5173)
 npm run dev
@@ -255,55 +277,33 @@ Output goes to `dist/`. The production server serves the SPA automatically from 
 
 ## Deployment
 
-### 1. Set environment variables on your host
+Petalpace is live at **https://petalpace.duckdns.org**, running on a $5/month Vultr server (Ubuntu, Singapore) with nginx, free HTTPS from Let's Encrypt, a free Duck DNS address, and email through Gmail.
 
-```
-NODE_ENV=production
-APP_URL=https://yourdomain.com
-APP_ORIGINS=https://yourdomain.com
-RESEND_API_KEY=re_xxxxxxxxxxxx
-FEEDBACK_FROM=noreply@yourdomain.com
-FEEDBACK_TO=your-email@example.com
-```
+The full step-by-step guide is in [`deploy/DEPLOY.md`](deploy/DEPLOY.md). In short:
 
-Optional — only needed behind a reverse proxy:
-```
-TRUSTED_PROXY=127.0.0.1
+```powershell
+# Put new changes live (from the project folder on Windows)
+.\deploy\upload.ps1 -VmIp YOUR_SERVER_IP
+
+# Copy the newest database backup to your PC (weekly)
+.\deploy\download-backup.ps1 -VmIp YOUR_SERVER_IP
 ```
 
-### 2. Build and start
+- Settings live in `/opt/petalpace/.env.local` on the server; user data in `/var/lib/petalpace`
+- Uploads back up the database first and never touch user data
+- Daily backups run at 2 AM and the server keeps the last 30
+- Only SSH key logins are allowed
 
-```bash
-npm run build
-node --env-file=.env.local server/index.mjs
-```
-
-The server listens on `0.0.0.0:3001` in production and serves the built SPA with SPA route fallback for client-side routes.
-
-### 3. Persistent storage
-
-Mount `server/data/` as a persistent volume on your host. The SQLite database lives at `server/data/accounts.sqlite`. Back it up regularly — the app does not include automated backup tooling.
-
-### 4. HTTPS
-
-Configure HTTPS at the reverse-proxy level (nginx, Caddy, or your hosting provider). The app enforces HTTPS in production mode (`APP_URL` must start with `https://`).
-
-### 5. Test email delivery
-
-Sign up with a real address on your live domain and confirm that verification, password reset, and feedback emails arrive correctly before opening to users.
-
-### Recommended hosts
-- [Railway](https://railway.app) — persistent volumes, easy Node deploy
-- [Render](https://render.com) — free tier with persistent disk add-on
-- [Fly.io](https://fly.io) — good for SQLite with persistent volumes
+Petalpace uses SQLite, so it runs as one Node.js process with a persistent disk. It isn't suited to serverless or multi-replica hosting.
 
 ---
 
 ## Known limitations
 
-- **Reminders are in-page only** — no push notifications or background workers. Reminders do not fire while the browser tab is closed.
+- **No push notifications** — reminders appear in the page and, if turned on, by email.
 - **Whole-planner saves** — every edit uploads the full task list. Existing attachments are sent as references, and files download only when opened.
-- **Deadlines follow device local time** — no fixed-timezone scheduling. A task's due date may shift if you travel and your device timezone changes.
+- **Gmail sending limit** — about 500 emails a day across verification, reset, reminder and invite emails.
+- **One server** — SQLite on a single small VPS. Fine for a class, team or small organisation; a bigger plan is needed for heavy use.
 - **No recurring tasks or offline drafts** — unsaved changes are lost if the browser tab is closed before a save completes.
 
 ---
@@ -346,7 +346,7 @@ src/
 
 ## Credits
 
-Created by **Mikyla Caras**.
+Created by **Mikyla Caras**, assisted by **Erica Espiña**.
 
 ---
 

@@ -29,6 +29,7 @@ rsync -avz --progress \
   --exclude '.git' \
   --exclude 'server/data' \
   --exclude '.env.local' \
+  --exclude '.env.server' \
   --exclude 'dist' \
   . "$SSH_USER@$VM_IP:$REMOTE_DIR/" \
   -e "ssh -i $SSH_KEY"

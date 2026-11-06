@@ -1,11 +1,11 @@
 # Copies the newest database backup from the VM to this computer.
 # It holds every user's data, so keep the folder private and out of Git.
-# Usage: powershell -ExecutionPolicy Bypass -File deploy\download-backup.ps1 YOUR_VM_IP
+# Usage: .\deploy\download-backup.ps1 -VmIp YOUR_SERVER_IP
 
 param(
   [Parameter(Mandatory = $true)][string]$VmIp,
   [string]$SshKey = "$env:USERPROFILE\.ssh\petalpace_key",
-  [string]$SshUser = "ubuntu",
+  [string]$SshUser = "root",
   [string]$Folder = "$env:USERPROFILE\PetalpaceBackups"
 )
 

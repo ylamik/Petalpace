@@ -1,12 +1,12 @@
-# Builds Petalpace and sends it to your Oracle VM from Windows.
+# Builds Petalpace and sends it to your server (Vultr, or any Ubuntu VPS) from Windows.
 # Your user data on the VM is never touched.
 # Usage, from the project folder:
-#   powershell -ExecutionPolicy Bypass -File deploy\upload.ps1 YOUR_VM_IP
+#   .\deploy\upload.ps1 -VmIp YOUR_SERVER_IP
 
 param(
   [Parameter(Mandatory = $true)][string]$VmIp,
   [string]$SshKey = "$env:USERPROFILE\.ssh\petalpace_key",
-  [string]$SshUser = "ubuntu"
+  [string]$SshUser = "root"
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,7 +22,7 @@ function Invoke-Checked([string]$Label, [scriptblock]$Command) {
 Invoke-Checked "Building Petalpace" { npm run build }
 
 Invoke-Checked "Packing files" {
-  tar --exclude=node_modules --exclude=.git --exclude=server/data --exclude=.env.local --exclude=backups -czf $archive .
+  tar --exclude=node_modules --exclude=.git --exclude=server/data --exclude=.env.local --exclude=.env.server --exclude=.env --exclude=backups -czf $archive .
 }
 
 Invoke-Checked "Uploading" { scp -i $SshKey $archive "${target}:/tmp/petalpace-upload.tgz" }
