@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-export type Account = { id: string; name: string; email: string; photoUrl?: string | null }
+export type Account = { id: string; name: string; email: string; photoUrl?: string | null; showReminderTip?: boolean }
 export const AuthContext = createContext<{
   user: Account | null
   loading: boolean

@@ -62,6 +62,11 @@ test('verified account survives restart; login, logout and session revocation wo
   assert.match(setCookie, /SameSite=Lax/)
   const cookie = setCookie.split(';')[0]
   assert.equal((await (await f.request('me', undefined, cookie)).json()).user.name, 'Mikyla')
+  // New accounts see the email reminder tip once; dismissing clears it for good.
+  assert.equal((await (await f.request('me', undefined, cookie)).json()).user.showReminderTip, true)
+  assert.equal((await f.request('reminder-tip-seen', {})).status, 401)
+  assert.equal((await f.request('reminder-tip-seen', {}, cookie)).status, 200)
+  assert.equal((await (await f.request('me', undefined, cookie)).json()).user.showReminderTip, false)
   const reopened = createAuthStore(path)
   assert.equal(reopened.prepare('SELECT verified FROM users WHERE email = ?').get(email).verified, 1)
   reopened.close()

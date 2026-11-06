@@ -17,7 +17,7 @@ test('fixed-zone deadlines survive travel, DST gaps, overlaps and future years',
 })
 test('email reminders opt in, skip active work, deduplicate restarts and retry safely',async()=>{
  const db=createAuthStore();let clock=Date.parse('2026-11-03T00:00Z'),messages=[],fails=true
- db.prepare('INSERT INTO users VALUES(?,?,?,?,1)').run('u','u@example.com','User','hash')
+ db.prepare('INSERT INTO users(id,email,name,password_hash,verified) VALUES(?,?,?,?,1)').run('u','u@example.com','User','hash')
  createPlannerHandler({db,findSession:()=>null,origins:[],limit:()=>{}})
  const task={id:'task',title:'<Task>',dueDate:'2026-11-04',dueTime:'08:00',dueZone:'Asia/Manila',done:false}
  db.prepare('INSERT INTO planners VALUES(?,?,?)').run('u',1,JSON.stringify({spaces:[],tasks:[task,{...task,id:'started',started:true},{...task,id:'done',done:true}]}))
@@ -34,7 +34,7 @@ test('email reminders opt in, skip active work, deduplicate restarts and retry s
 })
 test('reminder scans read planner JSON only after its revision changes',async()=>{
  const db=createAuthStore();const clock=Date.parse('2026-11-03T00:00Z');let messages=0,reads=0
- db.prepare('INSERT INTO users VALUES(?,?,?,?,1)').run('u','u@example.com','User','hash')
+ db.prepare('INSERT INTO users(id,email,name,password_hash,verified) VALUES(?,?,?,?,1)').run('u','u@example.com','User','hash')
  createPlannerHandler({db,findSession:()=>null,origins:[],limit:()=>{}})
  const prepare=db.prepare.bind(db)
  db.prepare=sql=>{if(sql.startsWith('SELECT data FROM planners'))reads++;return prepare(sql)}

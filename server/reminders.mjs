@@ -103,6 +103,7 @@ export function createReminderSettingsHandler({db,findSession,origins,limit,env=
   if(typeof data.enabled!=='boolean' || !validZone(data.zone))return reply(400,{error:'Choose a valid timezone and reminder preference.'})
   if(!findSession(req))return reply(401,{error:'Please sign in.'})
   db.prepare('INSERT INTO reminder_settings VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET enabled=excluded.enabled,zone=excluded.zone').run(user.id,data.enabled?1:0,data.zone)
+  if(data.enabled)db.prepare('UPDATE users SET reminder_tip=0 WHERE id=?').run(user.id)
   return reply(200,{enabled:data.enabled,zone:data.zone})
  }
 }

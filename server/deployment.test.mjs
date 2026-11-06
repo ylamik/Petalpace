@@ -39,7 +39,7 @@ test('consistent backup restores committed WAL data and refuses overwrites', asy
   t.after(() => rmSync(dir, { recursive: true, force: true }))
   const source = join(dir, 'live.sqlite'), copy = join(dir, 'backup.sqlite'), restored = join(dir, 'restored.sqlite')
   const db = createAuthStore(source)
-  db.prepare('INSERT INTO users VALUES(?,?,?,?,1)').run('u','test@example.com','Test','not-a-real-password')
+  db.prepare('INSERT INTO users(id,email,name,password_hash,verified) VALUES(?,?,?,?,1)').run('u','test@example.com','Test','not-a-real-password')
   await copyDatabase(source, copy)
   await assert.rejects(copyDatabase(source, copy))
   db.close()
@@ -51,7 +51,7 @@ test('consistent backup restores committed WAL data and refuses overwrites', asy
 test('scheduled cleanup expires Bin content without a planner request', () => {
   const db = createAuthStore()
   createPlannerHandler({ db, findSession: () => null, origins: [], limit: () => {} })
-  db.prepare('INSERT INTO users VALUES(?,?,?,?,1)').run('u','test@example.com','Test','unused')
+  db.prepare('INSERT INTO users(id,email,name,password_hash,verified) VALUES(?,?,?,?,1)').run('u','test@example.com','Test','unused')
   db.prepare('INSERT INTO task_trash VALUES(?,?,?,?)').run('u','old',1,'{}')
   cleanupExpired(db, 31 * 86400000)
   assert.equal(db.prepare('SELECT data FROM task_trash').get().data, null)

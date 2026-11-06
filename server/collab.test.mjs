@@ -6,7 +6,7 @@ import { createAuthHandler } from './auth.mjs'
 import { createFeedbackServer } from './feedback.mjs'
 async function fixture(t){
  const db=createAuthStore(),tokens=['a'.repeat(64),'b'.repeat(64),'c'.repeat(64)],messages=[]
- tokens.forEach((token,i)=>{db.prepare('INSERT INTO users VALUES(?,?,?,?,1)').run('u'+i,`u${i}@example.com`,'User '+i,'test');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(createHash('sha256').update(token).digest('hex'),'u'+i,Date.now()+86400000)})
+ tokens.forEach((token,i)=>{db.prepare('INSERT INTO users(id,email,name,password_hash,verified) VALUES(?,?,?,?,1)').run('u'+i,`u${i}@example.com`,'User '+i,'test');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(createHash('sha256').update(token).digest('hex'),'u'+i,Date.now()+86400000)})
  let reject=false
  const env={APP_URL:'http://localhost:5173',RESEND_API_KEY:'test-only',AUTH_FROM:'test@example.com'}
  const auth=createAuthHandler({db,env,send:async(url,opts)=>{messages.push(JSON.parse(opts.body));return {ok:!reject,json:async()=>reject?{}:{id:'mail'}}}})

@@ -53,7 +53,7 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
   }
   const userView = row => {
     const photo = db.prepare('SELECT version FROM profile_photos WHERE user_id = ?').get(row.id)
-    return { id: row.id, name: row.name, email: row.email, photoUrl: photo ? `/api/auth/photo?v=${photo.version}` : null }
+    return { id: row.id, name: row.name, email: row.email, photoUrl: photo ? `/api/auth/photo?v=${photo.version}` : null, showReminderTip: !!row.reminder_tip }
   }
   const findSession = req => db.prepare('SELECT users.* FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.hash = ? AND sessions.expires > ? AND users.verified = 1').get(sessionHash(req), now())
   function limit(key, max, period = 15 * 60000) {
@@ -186,7 +186,7 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
         })
         return res.end(zipBuffer)
       }
-      const actions = ['register', 'login', 'logout', 'verify', 'resend', 'forgot-password', 'reset-password', 'photo', 'photo-remove', 'delete-account']
+      const actions = ['register', 'login', 'logout', 'verify', 'resend', 'forgot-password', 'reset-password', 'photo', 'photo-remove', 'delete-account', 'reminder-tip-seen']
       const action = req.url?.slice('/api/auth/'.length)
       if (!actions.includes(action)) return reply(404, { error: 'Not found.' })
       if (req.method !== 'POST') return reply(405, { error: 'Use POST.' })
@@ -206,6 +206,12 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
       if (action === 'logout') {
         db.prepare('DELETE FROM sessions WHERE hash = ?').run(sessionHash(req))
         return reply(200, { ok: true }, { 'Set-Cookie': cookie('', 0) })
+      }
+      if (action === 'reminder-tip-seen') {
+        const member = findSession(req)
+        if (!member) return reply(401, { error: 'Please sign in again.' })
+        db.prepare('UPDATE users SET reminder_tip = 0 WHERE id = ?').run(member.id)
+        return reply(200, { ok: true })
       }
       const ip = ipFrom(req)
       limit(`ip:${ip}`, 60)
@@ -287,7 +293,7 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
         if (weak) return reply(400, { error: weak })
         const passwordHash = await runHash(() => hashPassword(password))
         // INSERT OR IGNORE also handles concurrent requests for the same email.
-        db.prepare('INSERT OR IGNORE INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)').run(randomUUID(), email, name, passwordHash)
+        db.prepare('INSERT OR IGNORE INTO users (id, email, name, password_hash, reminder_tip) VALUES (?, ?, ?, ?, 1)').run(randomUUID(), email, name, passwordHash)
         const account = db.prepare('SELECT * FROM users WHERE email = ?').get(email)
         if (!account.verified && await runHash(() => checkPassword(password, account.password_hash))) emailInBackground(account, 'verify')
         return reply(200, { ok: true, message: 'If this address is available, check your inbox for a verification link. Already registered? Sign in or reset your password.' })

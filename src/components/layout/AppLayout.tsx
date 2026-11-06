@@ -9,6 +9,7 @@ import ProgressDialog from '../../features/tasks/components/ProgressDialog'
 import AddTaskDialog, { type TaskDraft } from '../../features/tasks/components/AddTaskDialog'
 import { usePageTransition } from '../../hooks/usePageTransition'
 import { useSpaces } from '../../features/spaces/spaces'
+import ReminderTip from '../auth/ReminderTip'
 
 export default function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -131,6 +132,7 @@ export default function AppLayout() {
           style={{ opacity: transitioning ? 0.55 : 1 }}
         >
           <TaskReminders />
+          <ReminderTip />
           <Outlet />
         </main>
         {progressOpen && <ProgressDialog onClose={() => setProgressOpen(false)} />}

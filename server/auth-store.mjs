@@ -89,7 +89,9 @@ export function createAuthStore(path = ':memory:') {
     ['collab_files','subtask_id','TEXT'],
     ['collab_subtasks','notes',"TEXT NOT NULL DEFAULT ''"],
     ['collab_subtasks','links',"TEXT NOT NULL DEFAULT '[]'"],
-    ['collab_subtasks','status',"TEXT NOT NULL DEFAULT 'todo'"]
+    ['collab_subtasks','status',"TEXT NOT NULL DEFAULT 'todo'"],
+    // 1 = show the one-time email reminder tip. Existing accounts get 0, so only new sign-ups see it.
+    ['users','reminder_tip','INTEGER NOT NULL DEFAULT 0']
   ]) { if(!db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`) }
   db.exec("UPDATE collab_subtasks SET status='done' WHERE done=1 AND status<>'done'")
   return db
