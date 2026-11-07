@@ -2,7 +2,7 @@ import { createReminderSettingsHandler } from './reminders.mjs'
 import { clientIP } from './client-ip.mjs'
 import { createWorkQueue, hashConcurrency } from './work-queue.mjs'
 import { emailReady, mailSender } from './mailer.mjs'
-import { emailLayout, logoUrl } from './email-layout.mjs'
+import { emailLayout, escapeHtml } from './email-layout.mjs'
 import { createPlannerHandler } from './planner.mjs'
 import { buildZip } from './zip-builder.mjs'
 import { registerSSE } from './sse-broker.mjs'
@@ -70,17 +70,34 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
     const route = purpose === 'verify' ? '/verify-email' : '/reset-password'
     const link = new URL(route, publicUrl)
     link.hash = `token=${token}`
-    const action = purpose === 'verify' ? 'Verify your Petalpace email' : 'Reset your Petalpace password'
     db.prepare('INSERT INTO auth_tokens (hash, user_id, purpose, expires) VALUES (?, ?, ?, ?)').run(hash, user.id, purpose, now() + 30 * 60000)
+    // Account emails read like a note from a person: a greeting, why it was sent, and what
+    // happens next. A short button-only email from a new sender looks like phishing to spam filters.
+    // They also skip the remote logo, since a lone image from an unknown site adds to the spam score.
+    const name = String(user.name || '').trim().split(/\s+/)[0] || 'there'
+    const verify = purpose === 'verify'
+    const subject = verify ? `${name}, please confirm your email for Petalpace` : 'Your Petalpace password reset link'
+    const paragraphs = verify ? [
+      `Hi ${name},`,
+      `Thanks for signing up for Petalpace, a calm planner for your studies and your days. Please confirm that ${user.email} is your email address so we can finish creating your account.`,
+      'Once it is confirmed, you can sign in and start adding your spaces and tasks.',
+    ] : [
+      `Hi ${name},`,
+      `Someone asked to reset the password for the Petalpace account that uses ${user.email}. If it was you, use the link below to choose a new password.`,
+      'If you did not ask for this, you can ignore this email. Your password will stay the same.',
+    ]
+    const footer = verify
+      ? 'This link works once and expires in 30 minutes. If you did not sign up for Petalpace, you can safely ignore this email.'
+      : 'This link works once and expires in 30 minutes. For your security, please do not forward this email.'
     try {
       const response = await send('https://api.resend.com/emails', {
         method: 'POST', headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to: [user.email], subject: action,
-          text: `${action}\n\nOpen this link and confirm on the page:\n${link.href}\n\nThis link expires in 30 minutes and can be used once. If you did not request this, ignore this email. Never forward this link.`,
-          html: emailLayout(purpose === 'verify' ? 'Welcome to Petalpace' : 'Reset your password',
-            purpose === 'verify' ? '<p style="margin:0">Confirm your email to finish creating your account. Then you can start planning, one small step at a time.</p>' : '<p style="margin:0">We got a request to reset your Petalpace password. Choose a new one with the button below.</p>',
-            link.href, purpose === 'verify' ? 'Verify my email' : 'Choose a new password',
-            { preheader: 'This link expires in 30 minutes.', footer: 'This link expires in 30 minutes and works once. If you didn’t ask for this, you can ignore this email. Never forward this link.', logo: logoUrl(env) }) }),
+        body: JSON.stringify({ from, to: [user.email], subject,
+          text: `${paragraphs.join('\n\n')}\n\n${verify ? 'Confirm your email' : 'Choose a new password'}:\n${link.href}\n\n${footer}\n\nThe Petalpace team`,
+          html: emailLayout(verify ? 'Welcome to Petalpace' : 'Reset your password',
+            paragraphs.map((text, index) => `<p style="margin:${index ? '12px' : '0'} 0 0">${escapeHtml(text)}</p>`).join(''),
+            link.href, verify ? 'Confirm my email' : 'Choose a new password',
+            { preheader: verify ? 'One quick step to finish creating your Petalpace account.' : 'Use this link to choose a new Petalpace password.', footer: escapeHtml(footer) }) }),
         signal: AbortSignal.timeout(12000),
       })
       const result = await response.json().catch(() => null)
@@ -91,8 +108,8 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
       throw Object.assign(new Error('We could not send the account email. Please try again later. During local testing, the Resend test sender can only email its account owner.'), { status: 503 })
     }
   }
-  // Forgot-password and sign-up answer the same way for every email, so the send can't
-  // reveal an account through a failure or a slower response. Failures stay in the log.
+  // Sends without holding up the reply. Forgot-password answers the same way for every email,
+  // so the send can't reveal an account through a failure or a slower response. Failures stay in the log.
   const emailInBackground = (user, purpose) => {
     emailToken(user, purpose).catch(error => console.error(`Account email (${purpose}) failed: ${error.message}`))
   }
@@ -293,10 +310,19 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
         if (weak) return reply(400, { error: weak })
         const passwordHash = await runHash(() => hashPassword(password))
         // INSERT OR IGNORE also handles concurrent requests for the same email.
-        db.prepare('INSERT OR IGNORE INTO users (id, email, name, password_hash, reminder_tip) VALUES (?, ?, ?, ?, 1)').run(randomUUID(), email, name, passwordHash)
+        const created = db.prepare('INSERT OR IGNORE INTO users (id, email, name, password_hash, reminder_tip) VALUES (?, ?, ?, ?, 1)').run(randomUUID(), email, name, passwordHash).changes === 1
         const account = db.prepare('SELECT * FROM users WHERE email = ?').get(email)
-        if (!account.verified && await runHash(() => checkPassword(password, account.password_hash))) emailInBackground(account, 'verify')
-        return reply(200, { ok: true, message: 'If this address is available, check your inbox for a verification link. Already registered? Sign in or reset your password.' })
+        // Sign-up says plainly when an email is taken, so people aren't left waiting for an
+        // email that will never come. The per-email and per-IP limits above slow bulk probing.
+        if (account.verified) return reply(409, { error: 'An account with this email already exists. Sign in, or reset your password if you forgot it.', code: 'EMAIL_TAKEN' })
+        // A new account skips the second (slow) hash: its password was just stored.
+        if (created || await runHash(() => checkPassword(password, account.password_hash))) {
+          emailInBackground(account, 'verify')
+          return reply(200, { ok: true, code: created ? 'VERIFY_SENT' : 'VERIFY_RESENT', message: created
+            ? `Almost done! We sent a verification link to ${email}. It usually arrives within a minute. Check Spam too.`
+            : `You already started signing up with this email, so we sent a new verification link to ${email}. Check Spam too.` })
+        }
+        return reply(409, { error: 'This email already has an account waiting to be verified, with a different password. Reset your password to finish setting it up.', code: 'EMAIL_PENDING' })
       }
       const matches = await runHash(() => checkPassword(password, user?.password_hash))
       if (!matches || !user) return reply(401, { error: 'Email or password is incorrect.' })

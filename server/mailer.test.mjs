@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import net from 'node:net'
 
-import { buildMessage, emailReady, mailSender, sendSmtp } from './mailer.mjs'
+import { buildMessage, emailReady, mailSender, quotedPrintable, sendSmtp } from './mailer.mjs'
 import { createAuthStore } from './auth-store.mjs'
 import { createAuthHandler } from './auth.mjs'
 import { createFeedbackServer } from './feedback.mjs'
@@ -38,7 +38,8 @@ async function fakeSmtp(t, { rejectAuth = false } = {}) {
   return { mails, commands, env }
 }
 const body = mail => mail.split('\r\n\r\n').slice(1).join('\r\n\r\n')
-const decodedParts = mail => [...body(mail).matchAll(/base64\r\n\r\n([A-Za-z0-9+/=\r\n]+?)\r\n--/g)].map(m => Buffer.from(m[1].replace(/\r\n/g, ''), 'base64').toString())
+const decodeQP = text => Buffer.from(text.replace(/=\r\n/g, '').replace(/\r\n/g, '\n').replace(/=([0-9A-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16))), 'latin1').toString()
+const decodedParts = mail => [...body(mail).matchAll(/quoted-printable\r\n\r\n([\s\S]*?)\r\n--/g)].map(m => decodeQP(m[1]))
 
 test('sends a multipart message over SMTP with app-password login', async t => {
   const smtp = await fakeSmtp(t)
@@ -84,4 +85,18 @@ test('a password reset reaches the inbox through Gmail settings, with no Resend 
   assert.match(decodedParts(smtp.mails[0])[0], /reset-password#token=[a-f0-9]{64}/)
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM auth_tokens').get().n, 1)
 
+})
+
+test('quoted-printable keeps lines short, guards leading dots and round-trips any text', () => {
+  const samples = ['.hidden dot\nFrom here on\ntrailing space \nemoji 🌸 and é = equals', 'x'.repeat(200), `${'a'.repeat(74)}é`]
+  for (const text of samples) {
+    const encoded = quotedPrintable(text)
+    for (const line of encoded.split('\r\n')) {
+      assert.ok(line.length <= 76, line)
+      assert.ok(!line.startsWith('.') && !line.startsWith('From '), line)
+      assert.ok(!/[ \t]$/.test(line), line)
+      assert.ok(/^[\x20-\x7e]*$/.test(line), line)
+    }
+    assert.equal(decodeQP(encoded), text)
+  }
 })

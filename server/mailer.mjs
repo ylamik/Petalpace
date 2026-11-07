@@ -24,7 +24,26 @@ export function mailSender(env = process.env) {
 const address = value => (/<([^<>]+)>/.exec(value)?.[1] ?? value).trim()
 const clean = value => String(value).replace(/[\r\n]+/g, ' ').trim()
 const encodeHeader = value => /^[\x20-\x7e]*$/.test(value) ? value : `=?UTF-8?B?${Buffer.from(value).toString('base64')}?=`
-const base64Lines = text => Buffer.from(text).toString('base64').replace(/.{76}/g, '$&\r\n')
+// Quoted-printable keeps the text readable in the raw message. Spam filters score base64
+// text parts higher, since spammers use base64 to hide words from them.
+export function quotedPrintable(text) {
+  const out = []
+  for (const hardLine of String(text).split(/\r?\n/)) {
+    const bytes = Buffer.from(hardLine)
+    let line = ''
+    bytes.forEach((byte, index) => {
+      const last = index === bytes.length - 1
+      let token = (byte >= 33 && byte <= 126 && byte !== 61) || ((byte === 32 || byte === 9) && !last)
+        ? String.fromCharCode(byte) : `=${byte.toString(16).toUpperCase().padStart(2, '0')}`
+      if (line.length + token.length > 75) { out.push(line + '='); line = '' }
+      // A leading dot would end the SMTP DATA block, and a leading "From " gets mangled by some servers.
+      if (!line && (token === '.' || (token === 'F' && bytes.subarray(index, index + 5).toString() === 'From '))) token = `=${byte.toString(16).toUpperCase()}`
+      line += token
+    })
+    out.push(line)
+  }
+  return out.join('\r\n')
+}
 
 export function buildMessage(message, now = new Date()) {
   const from = clean(message.from), to = message.to.map(clean)
@@ -39,7 +58,7 @@ export function buildMessage(message, now = new Date()) {
     `Message-ID: <${randomBytes(16).toString('hex')}@${domain}>`,
     'MIME-Version: 1.0',
   ]
-  const part = (type, body) => [`--${boundary}`, `Content-Type: ${type}; charset=utf-8`, 'Content-Transfer-Encoding: base64', '', base64Lines(body)].join('\r\n')
+  const part = (type, body) => [`--${boundary}`, `Content-Type: ${type}; charset=utf-8`, 'Content-Transfer-Encoding: quoted-printable', '', quotedPrintable(body)].join('\r\n')
   const parts = [part('text/plain', message.text || ''), ...(message.html ? [part('text/html', message.html)] : [])]
   return [...headers, `Content-Type: multipart/alternative; boundary="${boundary}"`, '', ...parts, `--${boundary}--`, ''].join('\r\n')
 }
