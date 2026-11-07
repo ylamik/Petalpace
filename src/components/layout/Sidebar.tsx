@@ -128,20 +128,20 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScr
               <NavLink
                 to={"/spaces/" + space.id}
                 onClick={stayOrGo(`/spaces/${space.id}`)}
-                className="flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 text-left text-[0.9375rem] focus-visible:outline-2 focus-visible:outline-blue"
+                className={`flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 text-left text-[0.9375rem] focus-visible:outline-2 focus-visible:outline-blue ${compact ? "pr-20" : "[@media(hover:none)]:pr-20"}`}
               >
                 <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: space.color }} />
                 <span className="min-w-0 flex-1 truncate" title={space.name}>{space.name}</span>
-                {count > 0 && <span className="text-xs font-normal text-gray group-focus-within:invisible group-hover:invisible">{count}</span>}
+                {count > 0 && !compact && <span className="text-xs font-normal text-gray group-focus-within:invisible group-hover:invisible [@media(hover:none)]:hidden">{count}</span>}
               </NavLink>
 
-              {/* Edit and delete stay out of the way until the row is hovered or focused. */}
-              {!compact && (
-                <span className="absolute inset-y-0 right-1 flex items-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
-                  <button type="button" onClick={() => setEditId(space.id)} aria-label={`Edit ${space.name} space`} title={`Edit ${space.name}`} className="flex h-8 w-7 cursor-pointer items-center justify-center rounded-lg text-gray hover:text-link focus-visible:outline-blue">
+              {/* With a mouse, edit and delete appear on hover or focus. On touch screens (phones, iPads) and in the mobile menu there is no hover, so they always show. */}
+              {(
+                <span className={`absolute inset-y-0 right-1 flex items-center ${compact ? "" : "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"}`}>
+                  <button type="button" onClick={() => setEditId(space.id)} aria-label={`Edit ${space.name} space`} title={`Edit ${space.name}`} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-gray hover:text-link focus-visible:outline-blue">
                     <Icon className="h-3.5 w-3.5"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15v5Z" /></Icon>
                   </button>
-                  <button type="button" onClick={() => setDeleteId(space.id)} aria-label={`Delete ${space.name} space`} title={`Delete ${space.name}`} className="flex h-8 w-7 cursor-pointer items-center justify-center rounded-lg text-gray hover:text-red focus-visible:outline-blue">
+                  <button type="button" onClick={() => setDeleteId(space.id)} aria-label={`Delete ${space.name} space`} title={`Delete ${space.name}`} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-gray hover:text-red focus-visible:outline-blue">
                     <Icon className="h-3.5 w-3.5">{icons.bin}</Icon>
                   </button>
                 </span>
