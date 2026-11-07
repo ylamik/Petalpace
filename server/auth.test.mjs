@@ -153,13 +153,12 @@ test('wrong passwords from one address do not lock out the owner; a per-email ce
 })
 
 for (const [label, options] of [['rejected', { failEmail: true }], ['not configured', { env: { RESEND_API_KEY: '' } }]]) {
-  test(`forgot-password and sign-up answer identically for known and unknown emails when email is ${label}`, async t => {
+  test(`forgot-password answers identically for known and unknown emails when email is ${label}`, async t => {
     const f = await fixture(t, options)
     const reply = async (action, data) => { const response = await f.request(action, data); return [response.status, await response.json()] }
     await f.signup()
     f.db.prepare('UPDATE users SET verified = 1').run()
     assert.deepEqual(await reply('forgot-password', { email }), await reply('forgot-password', { email: 'nobody@example.com' }))
-    assert.deepEqual(await reply('register', { email, password, name: 'Mikyla' }), await reply('register', { email: 'new-person@example.com', password, name: 'New' }))
     await new Promise(resolve => setTimeout(resolve, 20))
     assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM auth_tokens').get().n, 0)
   })
@@ -226,4 +225,32 @@ test('export is private and password-confirmed deletion revokes account access',
   assert.equal((await f.request('delete-account',{password},cookie)).status,200)
   assert.equal((await f.request('me',undefined,cookie)).status,401)
   assert.equal(f.db.prepare('SELECT count(*) AS n FROM users').get().n,0)
+})
+
+test('sign-up says clearly when an email is new, pending or already registered', async t => {
+  const f = await fixture(t)
+  const reply = async data => { const response = await f.request('register', { email, password, name: 'Mikyla', ...data }); return [response.status, await response.json()] }
+  const [status, body] = await reply()
+  assert.equal(status, 200)
+  assert.equal(body.code, 'VERIFY_SENT')
+  assert.match(body.message, /mikyla@example\.com/)
+  await new Promise(resolve => setTimeout(resolve, 20))
+  assert.equal(f.messages.length, 1)
+  // Same email and password again: a fresh link goes out.
+  const [again, againBody] = await reply()
+  assert.equal(again, 200)
+  assert.equal(againBody.code, 'VERIFY_RESENT')
+  await new Promise(resolve => setTimeout(resolve, 20))
+  assert.equal(f.messages.length, 2)
+  // Pending account, different password: nothing is sent, and the page says why.
+  const [pending, pendingBody] = await reply({ password: 'Another garden grows 42!' })
+  assert.equal(pending, 409)
+  assert.equal(pendingBody.code, 'EMAIL_PENDING')
+  assert.equal(f.messages.length, 2)
+  f.db.prepare('UPDATE users SET verified = 1').run()
+  f.advance(16 * 60000)
+  const [taken, takenBody] = await reply()
+  assert.equal(taken, 409)
+  assert.equal(takenBody.code, 'EMAIL_TAKEN')
+  assert.equal(f.messages.length, 2)
 })

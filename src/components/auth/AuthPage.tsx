@@ -34,6 +34,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [notice, setNotice] = useState('')
   const [signInFailed, setSignInFailed] = useState(false)
+  const [emailTaken, setEmailTaken] = useState<'' | 'EMAIL_TAKEN' | 'EMAIL_PENDING'>('')
   const [typed, setTyped] = useState({ password: '', email: '', name: '' })
 
   async function submit(resend = false) {
@@ -51,6 +52,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
     setBusy(true)
     setNotice('')
     setSignInFailed(false)
+    setEmailTaken('')
     try {
       if (mode === 'sign-in' && !resend) {
         await signIn(email, password)
@@ -61,11 +63,14 @@ export default function AuthPage({ mode }: AuthPageProps) {
       const action = resend ? 'resend' : isSignUp ? 'register' : isVerify ? 'verify' : mode
       const result = await accountRequest(action, { email, password, name: String(data.get('name') || '').trim(), token })
       setNotice(result.message || 'Done.')
+      // After sign-up, offer a resend in case the email doesn't show up.
+      if (isSignUp) setNeedsVerification(true)
       if (isVerify || isReset || isForgot) { setFinished(true); form.reset() }
       if (isReset) await refresh()
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Please try again.')
       setNeedsVerification(error instanceof AuthError && error.code === 'EMAIL_UNVERIFIED')
+      setEmailTaken(isSignUp && error instanceof AuthError && (error.code === 'EMAIL_TAKEN' || error.code === 'EMAIL_PENDING') ? error.code : '')
       // Same message whether or not the email has an account, so the page never reveals who has signed up.
       setSignInFailed(mode === 'sign-in' && !resend && !(error instanceof AuthError && error.code === 'EMAIL_UNVERIFIED') && /incorrect/i.test(error instanceof Error ? error.message : ''))
     } finally { busyRef.current = false; setBusy(false) }
@@ -332,7 +337,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
                 className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-blue px-4 py-2.5 font-semibold text-white transition-colors hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue disabled:opacity-70"
               >
                 {busy && <ButtonSpinner />}
-                {busy ? (isForgot ? 'Sending reset link…' : isReset ? 'Saving password…' : 'Please wait…') : isSignUp ? 'Create account' : isVerify ? 'Verify email' : isForgot ? 'Send reset link' : isReset ? 'Save new password' : 'Sign in'}
+                {busy ? (isForgot ? 'Sending reset link…' : isReset ? 'Saving password…' : isSignUp ? 'Creating account…' : 'Please wait…') : isSignUp ? 'Create account' : isVerify ? 'Verify email' : isForgot ? 'Send reset link' : isReset ? 'Save new password' : 'Sign in'}
               </button>
               {needsVerification && <button type="button" onClick={() => void submit(true)} className="w-full rounded border border-blue px-4 py-2 text-link hover:bg-lightest-blue/50">Resend verification email</button>}
               </fieldset>
@@ -351,6 +356,11 @@ export default function AuthPage({ mode }: AuthPageProps) {
                   <>
                     <span className="block font-semibold">We couldn’t sign you in.</span>
                     <span className="mt-1 block">Check your email and password. New to Petalpace?{' '}<Link to="/sign-up" className="font-semibold text-link underline underline-offset-2 hover:decoration-2">Create an account</Link> or <Link to="/forgot-password" className="font-semibold text-link underline underline-offset-2 hover:decoration-2">reset your password</Link>.</span>
+                  </>
+                ) : emailTaken ? (
+                  <>
+                    <span className="block font-semibold">{emailTaken === 'EMAIL_TAKEN' ? 'This email already has a Petalpace account.' : 'This email is already waiting to be verified.'}</span>
+                    <span className="mt-1 block">{emailTaken === 'EMAIL_TAKEN' ? <><Link to="/sign-in" className="font-semibold text-link underline underline-offset-2 hover:decoration-2">Sign in</Link> instead, or </> : 'It was set up with a different password. '}<Link to="/forgot-password" className="font-semibold text-link underline underline-offset-2 hover:decoration-2">reset your password</Link>{emailTaken === 'EMAIL_TAKEN' ? ' if you forgot it.' : ' to finish creating it.'}</span>
                   </>
                 ) : notice}
               </p>
