@@ -138,25 +138,30 @@ export default function TodayPage() {
         <div className="min-w-0">
           <div className="relative inline-block pr-6">
             <h1 className="text-2xl font-bold leading-tight xl:text-3xl">
-              Make room for what matters to you.
+              Make room for what{" "}
+              {/* The underline is tied to "matters", so it stays under that word when the title wraps on small screens. */}
+              <span className="relative inline-block whitespace-nowrap">
+                matters
+                <img
+                  src="/images/yellow-line.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -bottom-4 -left-1 h-6 w-[calc(100%+0.75rem)] max-w-none object-fill"
+                />
+              </span>{" "}
+              to you.
             </h1>
 
             <img
               src="/images/yellow-doodle.png"
               alt=""
               aria-hidden="true"
-              className="pointer-events-none absolute -top-8 -right-9 h-15 w-25 object-contain"
+              className="pointer-events-none absolute -right-7 -top-6 h-10 w-16 object-contain sm:-right-9 sm:-top-8 sm:h-15 sm:w-25"
             />
 
-            <img
-              src="/images/yellow-line.png"
-              alt=""
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-10 right-20 h-20 w-40 object-contain"
-            />
           </div>
 
-          <div className="mt-2 flex items-center gap-3">
+          <div className="mt-4 flex items-center gap-3">
             <p className="text-base text-gray">{today}</p>
 
             <img
