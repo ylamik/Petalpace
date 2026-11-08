@@ -6,7 +6,7 @@ export const AuthContext = createContext<{
   loading: boolean
   error: string
   refresh: () => Promise<void>
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (email: string, password: string, remember?: boolean) => Promise<void>
   logout: () => Promise<void>
 } | null>(null)
 

@@ -53,12 +53,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener('pageshow', onPageShow)
     return () => { generation.current++; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('pageshow', onPageShow) }
   }, [refresh])
-  async function signIn(email: string, password: string) {
+  async function signIn(email: string, password: string, remember = false) {
     signingIn.current = true
     revision.current++
     try {
       if (endingSession.current) await endingSession.current
-      const result = await accountRequest('login', { email, password })
+      const result = await accountRequest('login', { email, password, remember: remember ? '1' : '0' })
       if (window.location.pathname === '/') {
         await revokeSession()
         throw new Error('Sign-in was cancelled when you returned Home. Please sign in again.')

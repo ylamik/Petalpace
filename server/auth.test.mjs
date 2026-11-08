@@ -60,6 +60,9 @@ test('verified account survives restart; login, logout and session revocation wo
   const setCookie = login.headers.get('set-cookie')
   assert.match(setCookie, /HttpOnly/)
   assert.match(setCookie, /SameSite=Lax/)
+  assert.doesNotMatch(setCookie, /Max-Age/) // without Remember me, the cookie ends with the browser
+  const remembered = await f.request('login', { email, password, remember: '1' })
+  assert.match(remembered.headers.get('set-cookie'), /Max-Age=2592000/)
   const cookie = setCookie.split(';')[0]
   assert.equal((await (await f.request('me', undefined, cookie)).json()).user.name, 'Mikyla')
   // New accounts see the email reminder tip once; dismissing clears it for good.

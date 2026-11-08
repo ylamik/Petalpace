@@ -46,7 +46,8 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
   if (production && publicUrl.protocol !== 'https:') throw new Error('APP_URL must use HTTPS in production.')
   const origins = (env.APP_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173').split(',').map(x => x.trim())
   const runHash = createWorkQueue({ concurrency: hashConcurrency(env) })
-  const cookie = (value, age) => `${cookieName}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${production ? '; Secure' : ''}`
+  // age null = a browser-session cookie that ends when the browser closes.
+  const cookie = (value, age) => `${cookieName}=${value}; Path=/; HttpOnly; SameSite=Lax${age === null ? '' : `; Max-Age=${age}`}${production ? '; Secure' : ''}`
   const sessionHash = req => {
     const value = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith(cookieName + '='))?.slice(cookieName.length + 1)
     return value && tokenPattern.test(value) ? digest(value) : ''
@@ -336,8 +337,11 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
       // An existing session is rotated rather than reused on login.
       db.prepare('DELETE FROM sessions WHERE hash = ?').run(sessionHash(req))
       const token = randomBytes(32).toString('hex')
-      db.prepare('INSERT INTO sessions (hash, user_id, expires) VALUES (?, ?, ?)').run(digest(token), user.id, now() + 7 * DAY)
-      return reply(200, { user: userView(user) }, { 'Set-Cookie': cookie(token, 7 * 86400) })
+      // "Remember me": stay signed in for 30 days. Otherwise the cookie ends when the browser closes,
+      // and the server ends the session after a day at most.
+      const remember = data.remember === true || data.remember === '1'
+      db.prepare('INSERT INTO sessions (hash, user_id, expires) VALUES (?, ?, ?)').run(digest(token), user.id, now() + (remember ? 30 : 1) * DAY)
+      return reply(200, { user: userView(user) }, { 'Set-Cookie': cookie(token, remember ? 30 * 86400 : null) })
     } catch (error) {
       if (res.headersSent) return res.destroy()
       return reply(error.status || 500, { error: error.status ? error.message : 'Something went wrong. Please try again.' })

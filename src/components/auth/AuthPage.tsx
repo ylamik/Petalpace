@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { accountRequest, AuthError, useAuth } from '../../features/auth/auth'
 import { passwordError, passwordProblems, passwordRuleLabels, type PasswordRule } from '../../features/auth/passwordRules'
+const rememberKey = 'petalpace-remembered-email'
 
 type AuthPageProps = {
   mode: 'sign-in' | 'sign-up' | 'verify-email' | 'forgot-password' | 'reset-password'
@@ -36,6 +37,9 @@ export default function AuthPage({ mode }: AuthPageProps) {
   const [signInFailed, setSignInFailed] = useState(false)
   const [emailTaken, setEmailTaken] = useState<'' | 'EMAIL_TAKEN' | 'EMAIL_PENDING'>('')
   const [typed, setTyped] = useState({ password: '', email: '', name: '' })
+  // Remember me keeps the person signed in for 30 days and fills in their email next time.
+  const [rememberedEmail] = useState(() => { try { return localStorage.getItem(rememberKey) || '' } catch { return '' } })
+  const [remember, setRemember] = useState(() => rememberedEmail !== '')
 
   async function submit(resend = false) {
     if (busyRef.current || !formRef.current?.reportValidity()) return
@@ -55,7 +59,8 @@ export default function AuthPage({ mode }: AuthPageProps) {
     setEmailTaken('')
     try {
       if (mode === 'sign-in' && !resend) {
-        await signIn(email, password)
+        await signIn(email, password, remember)
+        try { if (remember) localStorage.setItem(rememberKey, email); else localStorage.removeItem(rememberKey) } catch { /* storage unavailable */ }
         form.reset()
         navigate(afterSignIn, { replace: true })
         return
@@ -222,6 +227,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
                   autoCapitalize="none"
                   spellCheck={false}
                   placeholder="Enter email"
+                  defaultValue={mode === 'sign-in' ? rememberedEmail : undefined}
                   required
                   maxLength={254}
                   className={inputClass}
@@ -297,7 +303,11 @@ export default function AuthPage({ mode }: AuthPageProps) {
                 )}
 
                 {mode === 'sign-in' && (
-                  <div className="mt-2 text-right">
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                      <input type="checkbox" name="remember" checked={remember} onChange={e => setRemember(e.target.checked)} className="h-4 w-4 accent-blue" />
+                      Remember me
+                    </label>
                     <Link
                       to="/forgot-password"
                       className="inline-flex min-h-11 items-center rounded text-sm text-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue"
