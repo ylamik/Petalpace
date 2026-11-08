@@ -128,7 +128,7 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScr
               <NavLink
                 to={"/spaces/" + space.id}
                 onClick={stayOrGo(`/spaces/${space.id}`)}
-                className={`flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 text-left text-[0.9375rem] focus-visible:outline-2 focus-visible:outline-blue ${compact ? "pr-20" : "[@media(hover:none)]:pr-20"}`}
+                className={`flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 text-left text-[0.9375rem] focus-visible:outline-2 focus-visible:outline-blue ${compact ? "pr-20" : "group-hover:pr-20 group-focus-within:pr-20 [@media(hover:none)]:pr-20"}`}
               >
                 <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: space.color }} />
                 <span className="min-w-0 flex-1 truncate" title={space.name}>{space.name}</span>
