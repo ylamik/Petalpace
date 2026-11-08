@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSpaces, type Space } from './spaces'
+import { saveAndWait } from './saveAndWait'
+import { ButtonSpinner } from '../../components/ui/PageLoader'
 
 const palette = ['#BCDCF1', '#EBC39C', '#D0BEFF', '#F9DEA4', '#BFD2C8', '#FFACB3',
   '#D7E7FD', '#FDDCCD', '#D6DDC9', '#FDE8A8', '#C8DEFF', '#FFD6D6']
@@ -13,7 +15,8 @@ export default function EditSpaceDialog({
   onCancel: () => void
   onSaved: (updated: Space) => void
 }) {
-  const { spaces, setSpaces, setTasks } = useSpaces()
+  const { spaces, setSpaces, setTasks, ensureSaved } = useSpaces()
+  const [submitting, setSubmitting] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [name, setName] = useState(space.name)
   const [color, setColor] = useState(space.color)
@@ -48,6 +51,9 @@ export default function EditSpaceDialog({
       return
     }
     const updated: Space = { id: space.id, name: trimmed, color: chosen }
+    if (submitting) return
+    setSubmitting(true)
+    void saveAndWait(() => {
     // Update the space itself
     setSpaces((current) =>
       current.map((s) => (s.id === space.id ? updated : s)),
@@ -60,7 +66,7 @@ export default function EditSpaceDialog({
         ),
       )
     }
-    onSaved(updated)
+    }, ensureSaved).finally(() => { setSubmitting(false); onSaved(updated) })
   }
 
   const resolvedColor = /^#[0-9a-f]{6}$/i.test(custom) ? custom : color
@@ -162,9 +168,11 @@ export default function EditSpaceDialog({
           </button>
           <button
             type="submit"
-            className="min-h-11 rounded-lg bg-blue px-5 text-sm font-semibold text-white hover:bg-action-hover"
+            disabled={submitting}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue px-5 text-sm font-semibold text-white hover:bg-action-hover disabled:opacity-70"
           >
-            Save changes
+            {submitting && <ButtonSpinner />}
+            {submitting ? 'Saving…' : 'Save changes'}
           </button>
         </div>
       </form>

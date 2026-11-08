@@ -10,6 +10,7 @@ import FileTypeIcon from '../../../components/ui/FileTypeIcon'
 import { ButtonSpinner } from '../../../components/ui/PageLoader'
 import { TITLE_LIMIT, remapCompleted, validDueTime } from './taskPresentation'
 import { useSpaces } from '../../spaces/spaces'
+import { saveAndWait } from '../../spaces/saveAndWait'
 import ConfirmTaskDialog from './ConfirmTaskDialog'
 import { getStatus, statusChange, UNPINNED_ON_DONE } from './taskPresentation'
 import { useEffect, useRef, useState } from 'react'
@@ -43,7 +44,11 @@ function FileDownload({ file }: { file: TaskFile }) {
 }
 
 export default function TaskDetailsPanel({ task: originalTask, onChange: commitChanges, onClose, onDelete, spaceOptions: providedSpaces }: Props) {
-  const {spaces,tasks,saving,notify}=useSpaces()
+  const {spaces,tasks,saving:plannerSaving,notify,ensureSaved}=useSpaces()
+  const [submitting,setSubmitting]=useState(false)
+  const saving=plannerSaving || submitting
+  // Save, wait for the server, then close. The planner shows its own message if the save fails.
+  async function saveAndClose(changes:DetailTask){if(submitting)return;setSubmitting(true);try{await saveAndWait(()=>commit(changes),ensureSaved)}finally{setSubmitting(false);onClose()}}
   const commit=(changes:DetailTask)=>{if(originalTask.pinned && !originalTask.done && changes.done)notify(UNPINNED_ON_DONE);commitChanges(changes)}
   const spaceOptions=providedSpaces ?? spaces.map(s=>s.name)
   const [editingTitle,setEditingTitle]=useState(false)
@@ -62,8 +67,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
     if(tasks.some(t=>t.id!==(originalTask as {id?:string}).id && taskIdentity({...t,dueZone:t.dueZone || zone})===taskIdentity({...task,dueZone:zone}))){setError('This task already exists. Change the title, space, priority, or deadline.');return}
 
     if (task.space !== originalTask.space) { setConfirmMove(true); return }
-    commit({...task,title:task.title.trim()})
-    onClose()
+    void saveAndClose({...task,title:task.title.trim()})
   }
   const dialogRef = useRef<HTMLDialogElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -203,7 +207,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
           
           <div className="flex flex-wrap items-center justify-between gap-2">
             <button type="button" onClick={() => setConfirmDelete(true)} className="min-h-11 rounded px-2 text-sm text-red hover:bg-light-red/30">Delete task</button>
-            <button type="button" onClick={requestClose} className="min-h-11 rounded border border-blue px-3 text-sm text-link hover:bg-lightest-blue/50">Cancel</button>
+            <button type="button" disabled={submitting} onClick={requestClose} className="min-h-11 rounded border border-blue px-3 text-sm text-link hover:bg-lightest-blue/50">Cancel</button>
             <button type="button" onClick={saveChanges} disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded bg-blue px-4 text-sm text-white disabled:opacity-70 hover:bg-action-hover">
               {saving && <ButtonSpinner />}
               {saving ? 'Saving…' : 'Save changes'}
@@ -211,7 +215,7 @@ export default function TaskDetailsPanel({ task: originalTask, onChange: commitC
           </div>
         </footer>
       </div>
-      {confirmMove && <ConfirmTaskDialog title={`Move task to ${task.space}?`} message={`This task will leave ${originalTask.space} and appear in ${task.space}. Its notes, steps, files, deadline, and status are kept. Your other edits will also be saved.`} confirmLabel="Move and save" cancelLabel="Keep editing" destructive={false} onCancel={()=>setConfirmMove(false)} onConfirm={()=>{commit({...task,title:task.title.trim()});setConfirmMove(false);onClose()}}/>}
+      {confirmMove && <ConfirmTaskDialog title={`Move task to ${task.space}?`} message={`This task will leave ${originalTask.space} and appear in ${task.space}. Its notes, steps, files, deadline, and status are kept. Your other edits will also be saved.`} confirmLabel="Move and save" cancelLabel="Keep editing" destructive={false} onCancel={()=>setConfirmMove(false)} onConfirm={()=>{setConfirmMove(false);void saveAndClose({...task,title:task.title.trim()})}}/>}
       {discardOpen && <ConfirmTaskDialog title="Discard unsaved changes?" message="Your changes have not been saved. Leave this task and discard them?" confirmLabel="Discard changes" onCancel={() => setDiscardOpen(false)} onConfirm={onClose} />}
       {confirmDelete && <ConfirmTaskDialog title="Delete this task?" message={`This task and its attachments will move to Recently deleted. You can restore them within 30 days.`} confirmLabel="Move to Recently deleted" cancelLabel="Keep task" onCancel={() => setConfirmDelete(false)} onConfirm={onDelete} />}
     </dialog>

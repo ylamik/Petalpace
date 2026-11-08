@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import PlannerSelect from '../../components/ui/PlannerSelect'
 import { useSpaces, type Space } from './spaces'
+import { saveAndWait } from './saveAndWait'
+import { ButtonSpinner } from '../../components/ui/PageLoader'
 
 export default function DeleteSpaceDialog({space,onCancel,onDeleted}: {space:Space;onCancel:()=>void;onDeleted:()=>void}) {
-  const {spaces,tasks,deleteSpace}=useSpaces()
+  const {spaces,tasks,deleteSpace,ensureSaved}=useSpaces()
+  const [submitting,setSubmitting]=useState(false)
   const dialog=useRef<HTMLDialogElement>(null)
   const destinations=spaces.filter(item=>item.id!==space.id)
   const [target,setTarget]=useState(destinations[0]?.id ?? '')
@@ -14,7 +17,7 @@ export default function DeleteSpaceDialog({space,onCancel,onDeleted}: {space:Spa
     <header className="border-b border-dark-blue/10 bg-beige/60 px-5 py-4"><h2 id="delete-space-title" className="break-words text-xl font-semibold">Delete {space.name}?</h2></header>
     <div className="p-5"><p className="text-sm leading-relaxed">{count ? `This space has ${count} ${count===1?'task':'tasks'}. Choose another space to keep them in. No tasks or attachments will be deleted.` : 'This space is empty. Delete it from My spaces?'}</p>
       {!!count && (destinations.length ? <div className="mt-4"><p className="mb-2 text-sm font-medium">Move tasks to</p><PlannerSelect label="Move tasks to space" value={target} onChange={setTarget} options={destinations.map(item=>({value:item.id,label:item.name,color:item.color}))} className="w-full"/></div> : <p role="alert" className="mt-4 rounded-lg bg-light-pink p-3 text-sm text-red">Create another space first, so your tasks have somewhere to go.</p>)}
-      <div className="mt-6 flex flex-wrap justify-end gap-2"><button autoFocus type="button" onClick={onCancel} className="min-h-11 rounded-lg border border-blue px-4 py-2 text-sm font-semibold text-link hover:bg-lightest-blue/50">Cancel</button><button type="button" disabled={!canDelete} onClick={()=>{deleteSpace(space.id,target);onDeleted()}} className="min-h-11 rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 hover:brightness-90">{count?'Move tasks & delete space':'Delete space'}</button></div>
+      <div className="mt-6 flex flex-wrap justify-end gap-2"><button autoFocus type="button" disabled={submitting} onClick={onCancel} className="min-h-11 rounded-lg border border-blue px-4 py-2 text-sm font-semibold text-link hover:bg-lightest-blue/50">Cancel</button><button type="button" disabled={!canDelete || submitting} onClick={()=>{setSubmitting(true);void saveAndWait(()=>deleteSpace(space.id,target),ensureSaved).finally(()=>{setSubmitting(false);onDeleted()})}} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 hover:brightness-90">{submitting && <ButtonSpinner />}{submitting ? 'Deleting…' : count?'Move tasks & delete space':'Delete space'}</button></div>
     </div>
   </dialog>
 }

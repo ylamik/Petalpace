@@ -4,6 +4,7 @@ import TimePicker from './TimePicker'
 import PlannerSelect from '../../../components/ui/PlannerSelect'
 import TaskSpaceSelect from './TaskSpaceSelect'
 import { useSpaces } from '../../spaces/spaces'
+import { saveAndWait } from '../../spaces/saveAndWait'
 import TaskTitleInput from './TaskTitleInput'
 import TaskStatusSelect from './TaskStatusSelect'
 import FileTypeIcon from '../../../components/ui/FileTypeIcon'
@@ -45,7 +46,9 @@ type Props = {
 const field = 'min-h-10 w-full min-w-0 rounded-lg border border-dark-blue/20 bg-surface px-3 py-2 text-base placeholder:text-gray focus:outline-none focus:ring-2 focus:ring-blue/30'
 
 export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initialTask, focusDueDate = false, defaultSpace = '', spaceOptions: providedSpaces, canPin, onClose, onCreate }: Props) {
-  const {spaces,tasks,saving}=useSpaces()
+  const {spaces,tasks,saving:plannerSaving,ensureSaved}=useSpaces()
+  const [submitting,setSubmitting]=useState(false)
+  const saving=plannerSaving || submitting
   const spaceOptions=providedSpaces ?? spaces.map(s=>s.name)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -147,9 +150,11 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
     if(dueDate && deadlineInstant(dueDate,dueTime,dueZone)===null){setError('This time does not exist because the clocks change. Choose a different time.');return}
     const identity=taskIdentity({title,space,priority,dueDate,dueTime,dueZone})
     if(tasks.some(t=>t.id!==(initialTask as {id?:string})?.id && taskIdentity({...t,dueZone:t.dueZone || dueZone})===identity)){setError('This task already exists. Change the title, space, priority, or deadline.');return}
-    onCreate({ ...statusChange(status), title: title.trim(), space, priority, dueDate, dueTime, dueZone, notes: notes.trim(), pinned,
-      steps: steps.map((step) => step.text.trim()).filter(Boolean), files, links })
-    onClose()
+    if (submitting) return
+    setSubmitting(true)
+    // Create, wait for the server to confirm, then close. Closing either way avoids creating it twice.
+    void saveAndWait(() => onCreate({ ...statusChange(status), title: title.trim(), space, priority, dueDate, dueTime, dueZone, notes: notes.trim(), pinned,
+      steps: steps.map((step) => step.text.trim()).filter(Boolean), files, links }), ensureSaved).finally(() => { setSubmitting(false); onClose() })
   }
 
   return (
@@ -248,7 +253,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
           <button type="button" onClick={requestClose} className="min-h-11 rounded-lg border border-blue px-5 font-semibold text-link hover:bg-lightest-blue/30">Cancel</button>
           <button type="submit" disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue px-5 font-semibold text-white hover:bg-action-hover disabled:opacity-70">
             {saving && <ButtonSpinner />}
-            {saving ? 'Saving…' : initialTask ? 'Save changes' : 'Create task'}
+            {saving ? (initialTask ? 'Saving…' : 'Creating…') : initialTask ? 'Save changes' : 'Create task'}
           </button>
         </div>
       </form>

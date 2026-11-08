@@ -7,6 +7,7 @@ import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { accountRequest, useAuth } from '../../features/auth/auth'
 import ThemeControl from '../ui/ThemeControl'
+import { ButtonSpinner } from '../ui/PageLoader'
 
 function initials(name: string) {
   const words = name.trim().split(/\s+/).map(word => word.match(/\p{L}/u)?.[0]).filter(Boolean)
@@ -20,6 +21,7 @@ export default function ProfileMenu({ variant = 'avatar' }: { variant?: 'avatar'
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [cropFile, setCropFile] = useState<File | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
   const [confirmation, setConfirmation] = useState<'remove' | 'reset' | 'logout' | null>(null)
   const [remindersOpen,setRemindersOpen]=useState(false)
   const [reminders,setReminders]=useState<{enabled:boolean;zone:string}|null>(null)
@@ -100,9 +102,9 @@ export default function ProfileMenu({ variant = 'avatar' }: { variant?: 'avatar'
     finally { setBusy(false) }
   }
   async function signOut() {
-    setBusy(true)
-    try { if (!(await ensureSaved())) { setNotice('Your planner changes are not saved yet. Retry saving before signing out.'); setBusy(false); return } await logout() }
-    catch (error) { setNotice(error instanceof Error ? error.message : 'Could not sign out. Please try again.'); setBusy(false) }
+    setBusy(true); setSigningOut(true)
+    try { if (!(await ensureSaved())) { setNotice('Your planner changes are not saved yet. Retry saving before signing out.'); setBusy(false); setSigningOut(false); return } await logout() }
+    catch (error) { setNotice(error instanceof Error ? error.message : 'Could not sign out. Please try again.'); setBusy(false); setSigningOut(false) }
   }
   if (!user) return null
   const hasPhoto = !!user.photoUrl && failedPhoto !== user.photoUrl
@@ -141,7 +143,7 @@ export default function ProfileMenu({ variant = 'avatar' }: { variant?: 'avatar'
         <button type="button" disabled={busy} onClick={() => { setOpen(false); setDataAction('export') }} className={`${item} justify-between`}>Export my data<span className="text-xs text-gray">ZIP</span></button>
       </div>
       <div className="mt-2 border-t border-dark-blue/10 pt-2">
-        <button type="button" disabled={busy} onClick={() => ask('logout')} className={`${item} font-semibold`}>Sign out</button>
+        <button type="button" disabled={busy} onClick={() => ask('logout')} className={`${item} gap-2 font-semibold`}>{signingOut && <ButtonSpinner />}{signingOut ? 'Signing out…' : 'Sign out'}</button>
         <button type="button" disabled={busy} onClick={() => { setOpen(false); setDataAction('delete') }} className={`${item} text-sm text-red`}>Delete account</button>
       </div>
       {notice && <p role="status" className="mt-2 text-sm leading-relaxed">{notice}</p>}

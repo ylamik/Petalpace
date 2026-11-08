@@ -6,6 +6,7 @@ import AddTaskDialog from '../features/tasks/components/AddTaskDialog'
 import TaskDetailsPanel from '../features/tasks/components/TaskDetailsPanel'
 import EditSpaceDialog from '../features/spaces/EditSpaceDialog'
 import DeleteSpaceDialog from '../features/spaces/DeleteSpaceDialog'
+import PageLoader from '../components/ui/PageLoader'
 
 export default function SpacePage() {
   const { spaceId } = useParams()
@@ -13,16 +14,19 @@ export default function SpacePage() {
 }
 
 function SpaceContent({ spaceId }: { spaceId: string }) {
-  const { spaces, tasks, setTasks, notify: setNotice } = useSpaces()
+  const { spaces, tasks, setTasks, notify: setNotice, saving } = useSpaces()
   const navigate = useNavigate()
   const space = spaces.find((item) => item.id === spaceId)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // If the space existed when this page opened, it is being deleted (here or from the sidebar) until we move away.
+  const [existedOnOpen] = useState(() => !!space)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selected = tasks.find((task) => task.id === selectedId)
   const pinCount = tasks.filter((task) => task.pinned).length
 
+  if (!space && existedOnOpen && (deleting || saving)) return <PageLoader label="Deleting space…" />
   if (!space) return (
     <div>
       <h1 className="text-3xl font-bold">Space not found</h1>
