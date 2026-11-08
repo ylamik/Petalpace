@@ -230,7 +230,7 @@ export default function TodayPage() {
           </p>
         </div>
 
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
           {topTasks.map((task, index) => (
             <article
               key={task.id}
@@ -290,7 +290,7 @@ export default function TodayPage() {
       </section>
 
       {/* Task list and right column */}
-      <div className="mt-5 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="mt-5 grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <section
           aria-labelledby="today-title"
           className={`${cardShadow} min-w-0 bg-surface p-4`}
@@ -328,7 +328,7 @@ export default function TodayPage() {
           />
         </section>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
           {/* Progress heatmap */}
           <section
             aria-labelledby="progress-title"

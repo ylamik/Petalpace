@@ -304,7 +304,7 @@ export default function HomePage() {
         >
           <FloatingPetals />
 
-          <div className="relative z-10 mx-auto grid max-w-[1200px] items-center gap-8 px-6 py-12 sm:px-8 md:grid-cols-2 md:gap-10 md:py-14 lg:px-12">
+          <div className="relative z-10 mx-auto grid grid-cols-1 max-w-[1200px] items-center gap-8 px-6 py-12 sm:px-8 md:grid-cols-2 md:gap-10 md:py-14 lg:px-12">
             <motion.div
               className="min-w-0 text-center md:text-left"
               initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
@@ -497,7 +497,7 @@ export default function HomePage() {
               </p>
             </Reveal>
 
-            <ol className="mt-10 grid gap-10 md:grid-cols-2 md:gap-x-12 md:gap-y-12 lg:gap-x-20">
+            <ol className="mt-10 grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-x-12 md:gap-y-12 lg:gap-x-20">
               {/* Step 1 */}
               <motion.li
                 className="flex min-w-0 flex-col items-center gap-3 text-center md:flex-row md:items-start md:gap-4 md:text-left"
@@ -868,7 +868,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="bg-beige px-6 py-7 text-dark-blue sm:px-8">
         <div className="mx-auto max-w-6xl">
-          <div className="grid gap-6 md:grid-cols-[1fr_1.3fr_1fr] md:gap-8">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_1.3fr_1fr] md:gap-8">
             {/* Brand */}
             <div>
               <a href="/" aria-label="Petalpace home">

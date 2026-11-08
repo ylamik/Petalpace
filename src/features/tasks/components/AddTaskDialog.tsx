@@ -168,7 +168,7 @@ export default function AddTaskDialog({ initialTitle, defaultDueDate = '', initi
         </div>
         <div className="space-y-4">
           <TaskTitleInput value={title} onChange={v => { setTitle(v) }}/>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <p className="mb-1 block font-semibold">Space</p>
               <TaskSpaceSelect names={spaceOptions} value={space} onChange={setSpace} required className={field}/>

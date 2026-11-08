@@ -336,7 +336,7 @@ export default function CollaborationPage() {
           <h2 id="owned-title" className="mb-3 font-sans text-[0.9375rem] font-semibold text-gray">
             Created by you
           </h2>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {owned.map((task) => (
               <TaskCard
                 key={task.id}
@@ -353,7 +353,7 @@ export default function CollaborationPage() {
           <h2 id="joined-title" className="mb-3 font-sans text-[0.9375rem] font-semibold text-gray">
             Shared with you
           </h2>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {joined.map((task) => (
               <TaskCard
                 key={task.id}

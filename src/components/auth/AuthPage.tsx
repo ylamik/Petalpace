@@ -92,7 +92,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
 
   return (
     <main className="min-h-dvh bg-page font-sans text-dark-blue md:flex md:items-center md:justify-center md:p-6 lg:p-10">
-      <div className="mx-auto grid w-full max-w-[1000px] overflow-hidden bg-surface md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:rounded-xl md:border md:border-dark-blue/10 md:shadow-sm">
+      <div className="mx-auto grid grid-cols-1 w-full max-w-[1000px] overflow-hidden bg-surface md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:rounded-xl md:border md:border-dark-blue/10 md:shadow-sm">
         {/* Shared illustration panel */}
         <aside className="relative min-w-0 overflow-hidden bg-beige px-6 py-6 sm:px-10 md:flex md:flex-col md:py-10">
           <Link
@@ -289,7 +289,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
 
                 {newPassword && (
                   <div id="password-hint" className="mt-2 text-xs">
-                    <ul className="grid gap-1 sm:grid-cols-2">
+                    <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                       {(Object.keys(passwordRuleLabels) as PasswordRule[]).map(rule => {
                         const met = typed.password !== '' && !passwordProblems(typed.password, typed).includes(rule)
                         return (

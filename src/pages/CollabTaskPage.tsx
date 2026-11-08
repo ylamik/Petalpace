@@ -263,7 +263,7 @@ export default function CollabTaskPage() {
         <p className="mb-3 mt-1 text-sm text-gray">Files and links for the whole group. Resources for a delegated task belong inside that task below.</p>
         {resources()}
       </section>
-      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
         {/* Main column */}
         <div className="space-y-5">
           {/* Notes */}
@@ -513,7 +513,7 @@ function SharedDetails({task,save,canChangeZone}:{task:CollabTask;canChangeZone:
  const clean=title===task.title && date===task.dueDate && time===task.dueTime && priority===task.priority && zone===task.dueZone
  useEffect(()=>{if(clean)baseline.current=task.revision},[clean,task.revision])
  const input = 'mt-1.5 block min-h-11 w-full min-w-0 rounded-lg border border-dark-blue/20 bg-surface px-3 text-base focus:outline-none focus:ring-2 focus:ring-blue/30'
- return <form onSubmit={e=>{e.preventDefault();void submit()}} className="grid gap-4 sm:grid-cols-2">
+ return <form onSubmit={e=>{e.preventDefault();void submit()}} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
   <label className="text-sm font-semibold sm:col-span-2">Title<input required maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} className={`${input} font-normal`}/></label>
   <label className="text-sm font-semibold">Due date <span className="font-normal text-gray">(optional)</span><input type="date" value={date} onChange={e=>setDate(e.target.value)} className={`${input} font-normal`}/></label>
   <div className="text-sm"><p className="font-semibold">Priority</p><PlannerSelect priorityIcons label="Priority" value={priority} className="mt-1.5 w-full" options={['High','Medium','Low'].map(value=>({value,label:value}))} onChange={value=>setPriority(value as CollabTask['priority'])}/></div>

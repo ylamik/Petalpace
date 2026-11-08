@@ -106,7 +106,7 @@ export default function UpcomingPage() {
   }
 
   return (
-    <div className="relative grid min-w-0 gap-7 text-dark-blue lg:grid-cols-[minmax(0,1fr)_210px] xl:grid-cols-[minmax(0,1fr)_240px]">
+    <div className="relative grid grid-cols-1 min-w-0 gap-7 text-dark-blue lg:grid-cols-[minmax(0,1fr)_210px] xl:grid-cols-[minmax(0,1fr)_240px]">
       <section className="min-w-0" aria-label="Upcoming tasks">
         <TaskFilterBar
           value={filters}
@@ -279,7 +279,7 @@ export default function UpcomingPage() {
         </details>
       </section>
       <aside className="relative min-w-0 border-t border-dark-blue/15 pt-6 lg:border-t-0 lg:border-l lg:pl-4 lg:pt-0">
-        <div className="grid gap-6 sm:grid-cols-2 lg:block">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:block">
           <div className="paper-art relative">
             <img
               src="/images/doodle.png"
