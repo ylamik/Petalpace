@@ -136,7 +136,7 @@ export default function TodayPage() {
       {/* Greeting */}
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="relative inline-block pr-6">
+          <div className="relative inline-block max-w-full pr-10 sm:pr-6">
             <h1 className="text-2xl font-bold leading-tight xl:text-3xl">
               Make room for what{" "}
               {/* The underline is tied to "matters", so it stays under that word when the title wraps on small screens. */}
@@ -156,7 +156,7 @@ export default function TodayPage() {
               src="/images/yellow-doodle.png"
               alt=""
               aria-hidden="true"
-              className="pointer-events-none absolute -right-7 -top-6 h-10 w-16 object-contain sm:-right-9 sm:-top-8 sm:h-15 sm:w-25"
+              className="pointer-events-none absolute -top-6 right-0 h-10 w-12 object-contain sm:-right-9 sm:-top-8 sm:h-15 sm:w-25"
             />
 
           </div>
@@ -213,14 +213,14 @@ export default function TodayPage() {
       {/* My top three */}
       <section aria-labelledby="top-three-title" className="mt-5">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <h2 id="top-three-title" className="text-xl font-bold">
+          <div className="flex shrink-0 items-center gap-2">
+            <h2 id="top-three-title" className="whitespace-nowrap text-xl font-bold">
               My top 3
             </h2>
             <img
               src="/images/yellow-stars.png"
               alt=""
-              className="h-10 w-10 object-contain"
+              className="h-8 w-8 object-contain sm:h-10 sm:w-10"
             />
           </div>
 
@@ -308,7 +308,7 @@ export default function TodayPage() {
               </h2>
             </div>
 
-            <span className="text-xs text-gray">{tasks.length} tasks</span>
+            <span className="text-xs text-gray">{tasks.length} {tasks.length === 1 ? "task" : "tasks"}</span>
           </div>
 
           <TaskRows

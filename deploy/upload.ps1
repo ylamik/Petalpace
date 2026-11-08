@@ -22,7 +22,7 @@ function Invoke-Checked([string]$Label, [scriptblock]$Command) {
 Invoke-Checked "Building Petalpace" { npm run build }
 
 Invoke-Checked "Packing files" {
-  tar --exclude=node_modules --exclude=.git --exclude=server/data --exclude=.env.local --exclude=.env.server --exclude=.env --exclude=backups -czf $archive .
+  tar --exclude=node_modules --exclude=.git --exclude=server/data --exclude=.env.local --exclude=.env.server --exclude=.env --exclude=backups --exclude="Claude outputs" -czf $archive .
 }
 
 Invoke-Checked "Uploading" { scp -i $SshKey $archive "${target}:/tmp/petalpace-upload.tgz" }

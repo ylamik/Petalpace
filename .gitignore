@@ -26,3 +26,6 @@ server/data/
 *.njsproj
 *.sln
 *.sw?
+
+# Files Claude made for you (posters, temporary syncs)
+Claude outputs/

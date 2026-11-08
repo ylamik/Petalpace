@@ -128,7 +128,7 @@ export default function AppLayout() {
 
         {/* Page content — dims briefly when navigating */}
         <main
-          className="mx-auto max-w-[1400px] px-5 py-7 sm:px-8 lg:p-10 transition-opacity duration-300"
+          className="mx-auto max-w-[1400px] overflow-x-clip px-5 py-7 sm:px-8 lg:p-10 transition-opacity duration-300"
           style={{ opacity: transitioning ? 0.55 : 1 }}
         >
           <TaskReminders />
