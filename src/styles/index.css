@@ -146,6 +146,19 @@ body {
 /* Clear interactive affordances and room around native-select chevrons. */
 button:not(:disabled), a[href], select:not(:disabled), summary, [role="button"], input[type="checkbox"], input[type="radio"] { cursor: pointer; }
 button:disabled, select:disabled { cursor: not-allowed; }
+
+/* Phones and tablets (Android and iPhone) */
+/* Keep text from being enlarged when an iPhone rotates to landscape. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* iPhone zooms the page when a field under 16px is focused, which breaks the layout. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px !important; }
+}
+/* Safari gives date/time fields a fixed minimum width and centres the value, so they can spill out of cards. */
+input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; }
+input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value { text-align: left; }
+/* Long words, emails and links wrap instead of pushing cards wider than the screen. */
+h1, h2, h3, p, li, a { overflow-wrap: break-word; }
 select { appearance: none; padding-right: 2.5rem !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232F3C74' stroke-width='1.8'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .8rem center; }
 
 /* Separate surfaces, readable text, and action colors: photos and space colors stay intact. */
