@@ -175,7 +175,7 @@ Work on a task together with other Petalpace users.
 
 ### Accounts
 - Email + password registration with email verification
-- Secure sessions, rotated on login. "Remember me" keeps you signed in for 30 days and fills in your email; otherwise the session ends when the browser closes (1 day at most)
+- Secure sessions, rotated on login. "Remember me" keeps you signed in for 30 days; otherwise the session ends when the browser closes (1 day at most)
 - Password reset via email link (single-use, 30-minute expiry)
 - Profile photo (JPG/PNG/WebP, cropped to 512×512 WebP, metadata stripped)
 - Account deletion with password confirmation — removes all data immediately

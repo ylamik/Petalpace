@@ -151,6 +151,11 @@ export default function ProfileMenu({ variant = 'avatar' }: { variant?: 'avatar'
     {dataAction && <AccountDataDialog mode={dataAction} onClose={()=>{setDataAction(null);setOpen(true)}}/>}
     {remindersOpen && <ReminderSettings onClose={()=>setRemindersOpen(false)}/>}
       {cropFile && <PhotoCropDialog file={cropFile} onCancel={()=>{setCropFile(null);setOpen(true)}} onSave={savePhoto}/>}
+    {signingOut && <div role="status" aria-live="assertive" className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-canvas/85 text-dark-blue backdrop-blur-[2px]">
+      <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-blue/25 border-t-blue" aria-hidden="true" />
+      <p className="text-lg font-semibold">Signing out…</p>
+      <p className="text-sm text-gray">Saving your planner first</p>
+    </div>}
     {confirmation && <ConfirmTaskDialog
       title={confirmation==='remove' ? 'Remove your profile photo?' : confirmation==='reset' ? 'Reset your password?' : 'Sign out of Petalpace?'}
       message={confirmation==='remove' ? 'Your initials will appear instead. You can add another photo anytime.' : confirmation==='reset' ? 'Continue to the password reset page to request a secure email link. Your password stays the same until you choose a new one.' : 'Your saved tasks will be here when you sign in again.'}
