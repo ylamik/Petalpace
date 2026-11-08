@@ -35,7 +35,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [notice, setNotice] = useState('')
-  const [signInFailed, setSignInFailed] = useState(false)
+  const [signInFailed, setSignInFailed] = useState<'' | 'NO_ACCOUNT' | 'WRONG_PASSWORD'>('')
   const [emailTaken, setEmailTaken] = useState<'' | 'EMAIL_TAKEN' | 'EMAIL_PENDING'>('')
   const [typed, setTyped] = useState({ password: '', email: '', name: '' })
   // Remember me only keeps the person signed in for 30 days. Nothing they typed is stored in the browser.
@@ -55,7 +55,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
     busyRef.current = true
     setBusy(true)
     setNotice('')
-    setSignInFailed(false)
+    setSignInFailed('')
     setEmailTaken('')
     try {
       if (mode === 'sign-in' && !resend) {
@@ -76,7 +76,11 @@ export default function AuthPage({ mode }: AuthPageProps) {
       setNeedsVerification(error instanceof AuthError && error.code === 'EMAIL_UNVERIFIED')
       setEmailTaken(isSignUp && error instanceof AuthError && (error.code === 'EMAIL_TAKEN' || error.code === 'EMAIL_PENDING') ? error.code : '')
       // Same message whether or not the email has an account, so the page never reveals who has signed up.
-      setSignInFailed(mode === 'sign-in' && !resend && !(error instanceof AuthError && error.code === 'EMAIL_UNVERIFIED') && /incorrect/i.test(error instanceof Error ? error.message : ''))
+      const failure = mode === 'sign-in' && !resend && error instanceof AuthError && (error.code === 'NO_ACCOUNT' || error.code === 'WRONG_PASSWORD') ? error.code : ''
+      setSignInFailed(failure)
+      // Wrong password: clear it and put the cursor back so they can retype. No account: let them fix the email.
+      const field = formRef.current?.elements.namedItem(failure === 'WRONG_PASSWORD' ? 'password' : 'email')
+      if (failure && field instanceof HTMLInputElement) { if (failure === 'WRONG_PASSWORD') field.value = ''; field.focus(); if (failure === 'NO_ACCOUNT') field.select() }
     } finally { busyRef.current = false; setBusy(false) }
   }
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -360,10 +364,15 @@ export default function AuthPage({ mode }: AuthPageProps) {
                     : 'sr-only'
                 }
               >
-                {signInFailed ? (
+                {signInFailed === 'NO_ACCOUNT' ? (
                   <>
-                    <span className="block font-semibold">We couldn’t sign you in.</span>
-                    <span className="mt-1 block">Check your email and password. New to Petalpace?{' '}<Link to="/sign-up" className="font-semibold text-link underline underline-offset-2 hover:decoration-2">Create an account</Link> or <Link to="/forgot-password" className="font-semibold text-link underline underline-offset-2 hover:decoration-2">reset your password</Link>.</span>
+                    <span className="block font-semibold">No account found with this email.</span>
+                    <span className="mt-1 block">Check the spelling, or{' '}<Link to="/sign-up" className="font-semibold text-link underline underline-offset-2 hover:decoration-2">create an account</Link> if you’re new to Petalpace.</span>
+                  </>
+                ) : signInFailed === 'WRONG_PASSWORD' ? (
+                  <>
+                    <span className="block font-semibold">That password is incorrect.</span>
+                    <span className="mt-1 block">Try again, or{' '}<Link to="/forgot-password" className="font-semibold text-link underline underline-offset-2 hover:decoration-2">reset your password</Link> if you forgot it.</span>
                   </>
                 ) : emailTaken ? (
                   <>

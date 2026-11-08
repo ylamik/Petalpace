@@ -326,9 +326,11 @@ export function createAuthHandler({ db, env = process.env, send, now = Date.now 
         return reply(409, { error: 'This email already has an account waiting to be verified, with a different password. Reset your password to finish setting it up.', code: 'EMAIL_PENDING' })
       }
       const matches = await runHash(() => checkPassword(password, user?.password_hash))
-      if (!matches || !user) return reply(401, { error: 'Email or password is incorrect.' })
+      // Say which part is wrong. The login limits above still stop anyone guessing passwords or emails at scale.
+      if (!user) return reply(401, { error: "There's no Petalpace account with this email.", code: 'NO_ACCOUNT' })
+      if (!matches) return reply(401, { error: 'That password is incorrect.', code: 'WRONG_PASSWORD' })
       const current = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id)
-      if (!current || current.password_hash !== user.password_hash) return reply(401, { error: 'Email or password is incorrect.' })
+      if (!current || current.password_hash !== user.password_hash) return reply(401, { error: 'That password is incorrect.', code: 'WRONG_PASSWORD' })
       if (action === 'resend') {
         if (!user.verified) await emailToken(user, 'verify')
         return reply(200, { ok: true, message: 'Check your inbox for a verification link. If already verified, you can sign in.' })

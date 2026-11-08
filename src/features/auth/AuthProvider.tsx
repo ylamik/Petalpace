@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import { accountRequest, AuthContext, type Account } from './auth'
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
@@ -9,7 +9,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const revision = useRef(0)
   const signingIn = useRef(false)
   const navigate = useNavigate()
-  const location = useLocation()
+
   const endingSession = useRef<Promise<unknown> | null>(null)
   const revokeSession = useCallback(() => {
     if (!endingSession.current) endingSession.current = accountRequest('logout', {}).finally(() => { endingSession.current = null })
@@ -19,9 +19,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     if (signingIn.current) return
     const current = ++revision.current
     try {
-      const mustSignIn = window.location.pathname === '/' || sessionStorage.getItem('petalpace-require-signin') === '1'
-      if (mustSignIn) sessionStorage.setItem('petalpace-require-signin', '1')
-      const result = mustSignIn ? (await revokeSession(), { user: null }) : await accountRequest('me')
+      // After signing out in this tab, don't trust a cached session until the person signs in again.
+      const mustSignIn = sessionStorage.getItem('petalpace-require-signin') === '1'
+      const result = mustSignIn ? { user: null } : await accountRequest('me')
       if (current !== revision.current) return
       setUser(result.user ?? null)
       setError('')
@@ -30,14 +30,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
       setError(error instanceof Error ? error.message : 'Unable to check your session.')
     } finally { if (current === revision.current) setLoading(false) }
-  }, [revokeSession])
-  useEffect(() => {
-    if (location.pathname !== '/') return
-    sessionStorage.setItem('petalpace-require-signin', '1')
-    // Returning Home explicitly ends this session, including Back navigation.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void refresh()
-  }, [location.pathname, refresh])
+  }, [])
+  // Visiting the home page no longer signs you out, so "Remember me" keeps working when you come back.
   useEffect(() => {
     const generation = revision
     // The request resolves asynchronously; there are no synchronous state updates.
@@ -59,10 +53,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (endingSession.current) await endingSession.current
       const result = await accountRequest('login', { email, password, remember: remember ? '1' : '0' })
-      if (window.location.pathname === '/') {
-        await revokeSession()
-        throw new Error('Sign-in was cancelled when you returned Home. Please sign in again.')
-      }
       sessionStorage.removeItem('petalpace-require-signin')
       revision.current++
       setUser(result.user ?? null)
@@ -78,5 +68,5 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     // Replace current history entry so protected pages are not reachable via Forward.
     navigate('/', { replace: true })
   }
-  return <AuthContext.Provider value={{ user: location.pathname === '/' || sessionStorage.getItem('petalpace-require-signin') === '1' ? null : user, loading, error, refresh, signIn, logout }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user: sessionStorage.getItem('petalpace-require-signin') === '1' ? null : user, loading, error, refresh, signIn, logout }}>{children}</AuthContext.Provider>
 }

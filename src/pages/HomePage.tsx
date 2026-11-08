@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { useAuth } from "../features/auth/auth";
 
 type RevealProps = {
   children: ReactNode;
@@ -136,6 +137,8 @@ const navLinks = [
 ];
 
 export default function HomePage() {
+  // Signed-in visitors (e.g. with Remember me) get a link straight to their planner.
+  const { user } = useAuth();
   const reduceMotion = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
   const [feedbackState, setFeedbackState] = useState<
@@ -226,10 +229,10 @@ export default function HomePage() {
             ))}
 
             <a
-              href="/sign-in"
+              href={user ? "/today" : "/sign-in"}
               className="hidden whitespace-nowrap rounded-md px-3 py-2 transition hover:bg-blue/10 md:inline-block"
             >
-              Sign in
+              {user ? "Open my planner" : "Sign in"}
             </a>
 
             {/* Hamburger (mobile only) */}
@@ -282,11 +285,11 @@ export default function HomePage() {
               ))}
 
               <a
-                href="/sign-in"
+                href={user ? "/today" : "/sign-in"}
                 onClick={() => setMenuOpen(false)}
                 className="rounded-md px-3 py-2.5 transition hover:bg-blue/10"
               >
-                Sign in
+                {user ? "Open my planner" : "Sign in"}
               </a>
             </nav>
           </div>
@@ -327,10 +330,10 @@ export default function HomePage() {
               </p>
 
               <a
-                href="/sign-up"
+                href={user ? "/today" : "/sign-up"}
                 className="mt-7 inline-flex items-center justify-center gap-3 rounded-md bg-blue px-5 py-3 font-semibold text-white transition hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue"
               >
-                Create your free account
+                {user ? "Go to my planner" : "Create your free account"}
                 <span aria-hidden="true">→</span>
               </a>
 
