@@ -1,6 +1,6 @@
 import TimePicker from '../features/tasks/components/TimePicker'
 import { deadlineInstant } from '../features/tasks/deadlineZone'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { collabApi, type CollabTask, type CollabSubtask, type CollabUpdatePayload } from '../features/collab/collab'
 import PageLoader from '../components/ui/PageLoader'
@@ -29,19 +29,23 @@ const permissionLabel = (role: string) => permissionOptions.find(o => o.value ==
 type InviteRow = { key: number; email: string; permission: string }
 const TrashIcon = () => <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
 
-function MemberBadge({ member }: { member: CollabTask['members'][number] }) {
+// Name and email get the full width; the role sits underneath so long names aren't cut short.
+function MemberBadge({ member, showRole = true, action }: { member: CollabTask['members'][number]; showRole?: boolean; action?: ReactNode }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-dark-blue/15 bg-beige/40 px-3 py-2 text-sm">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#FF686C] text-xs font-semibold text-white">
+    <div className="flex items-start gap-3 text-sm">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#FF686C] text-xs font-semibold text-white">
         {member.photoUrl ? <img src={member.photoUrl} alt="" className="h-full w-full object-cover" /> : member.name.slice(0, 2).toUpperCase()}
       </div>
-      <div className="min-w-0">
-        <p className="truncate font-medium">{member.name}</p>
-        <p className="truncate text-xs text-gray">{member.email}</p>
+      <div className="min-w-0 flex-1">
+        <p className="break-words font-medium leading-snug" title={member.name}>{member.name}</p>
+        <p className="break-all text-xs leading-snug text-gray">{member.email}</p>
+        {showRole && (
+          <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-xs ${member.role === 'owner' ? 'bg-lightest-blue text-dark-blue' : 'bg-light-gray/60 text-gray'}`}>
+            {member.role === 'owner' ? 'Owner' : permissionLabel(member.role)}
+          </span>
+        )}
       </div>
-      <span className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-xs ${member.role === 'owner' ? 'bg-lightest-blue text-dark-blue' : 'bg-light-gray/60 text-gray'}`}>
-        {member.role === 'owner' ? 'Owner' : permissionLabel(member.role)}
-      </span>
+      {action}
     </div>
   )
 }
@@ -63,6 +67,8 @@ export default function CollabTaskPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [stepToRemove,setStepToRemove]=useState<CollabSubtask | null>(null)
+  const [linkNote,setLinkNote]=useState<'' | 'copied' | 'failed'>('')
+  useEffect(()=>{if(!linkNote)return;const timer=setTimeout(()=>setLinkNote(''),4000);return()=>clearTimeout(timer)},[linkNote])
   const [pendingStep,setPendingStep]=useState<{step:CollabSubtask;status:StepStatus} | null>(null)
   const [detailsOpen,setDetailsOpen]=useState(false)
   const [newSubtask, setNewSubtask] = useState('')
@@ -223,7 +229,7 @@ export default function CollabTaskPage() {
             <h1 className="break-words text-2xl font-bold sm:text-3xl">{task.title}</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={()=>{navigator.clipboard.writeText(window.location.href).then(()=>setSaveError('Task link copied. Only invited members can open it.')).catch(()=>setSaveError('Copy the page address to share with existing members.'))}} className="min-h-10 rounded-lg border border-blue/30 px-3 text-sm text-link hover:bg-lightest-blue/50">Copy task link</button>
+            <button type="button" onClick={()=>{navigator.clipboard.writeText(window.location.href).then(()=>setLinkNote('copied')).catch(()=>setLinkNote('failed'))}} className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg border px-3 text-sm ${linkNote==='copied' ? 'border-done-stroke bg-done-badge text-done-ink' : 'border-blue/30 text-link hover:bg-lightest-blue/50'}`}>{linkNote==='copied' ? <><span aria-hidden="true">✓</span>Link copied</> : 'Copy task link'}</button>
             {/* Status selector — all members can change */}
             {canEdit && !saving ? (
               <PlannerSelect
@@ -246,6 +252,7 @@ export default function CollabTaskPage() {
         </div>
         {syncing && <p role="status" className="mt-3 text-sm text-link">Updating shared task…</p>}
         {saving && <p className="mt-3 text-xs text-gray flex items-center gap-2"><ButtonSpinner />Saving…</p>}
+        {linkNote && <p role="status" className={`mt-3 text-sm ${linkNote==='copied' ? 'text-done-ink' : 'text-gray'}`}>{linkNote==='copied' ? 'Only invited members can open this link.' : 'Couldn’t copy automatically. Copy the page address from your browser instead.'}</p>}
         {saveError && <div role="alert" className="mt-3 text-sm text-red">{saveError}<button onClick={()=>window.location.reload()} className="ml-2 text-link underline hover:decoration-2">Reload shared task</button></div>}
       </header>
 
@@ -340,13 +347,16 @@ export default function CollabTaskPage() {
             <h2 className="mb-3 font-bold">Members</h2>
             <div className="space-y-2">
               {task.members.map(m => (
-                <div key={m.id} className="group flex items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <MemberBadge member={m} />{isOwner && m.role!=='owner' && <PlannerSelect label={`Permission for ${m.name}`} value={m.role==='member'?'steps':m.role} className="mt-1 min-h-10 w-full" options={permissionOptions} onChange={value=>{void collabApi.permission(task.id,m.id,value).then(r=>setTask(r.task)).catch(e=>setSaveError(e.message))}}/>}
-                  </div>
-                  {isOwner && m.role !== 'owner' && (
-                    <button type="button" onClick={() => setMemberToRemove(m.id)} aria-label={`Remove ${m.name}`} className="shrink-0 rounded px-1.5 text-xs text-red opacity-0 group-hover:opacity-100 hover:bg-light-red/30 focus-visible:opacity-100">Remove</button>
-                  )}
+                <div key={m.id} className="rounded-xl border border-dark-blue/15 bg-beige/40 p-3">
+                  {/* The owner edits other members' access with the dropdown, so the role pill would repeat it. */}
+                  <MemberBadge
+                    member={m}
+                    showRole={!(isOwner && m.role !== 'owner')}
+                    action={isOwner && m.role !== 'owner' ? (
+                      <button type="button" onClick={() => setMemberToRemove(m.id)} aria-label={`Remove ${m.name}`} title={`Remove ${m.name}`} className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray hover:bg-light-red/30 hover:text-red"><TrashIcon /></button>
+                    ) : undefined}
+                  />
+                  {isOwner && m.role!=='owner' && <PlannerSelect label={`Permission for ${m.name}`} value={m.role==='member'?'steps':m.role} className="mt-3 min-h-10 w-full" options={permissionOptions} onChange={value=>{void collabApi.permission(task.id,m.id,value).then(r=>setTask(r.task)).catch(e=>setSaveError(e.message))}}/>}
                 </div>
               ))}
             </div>

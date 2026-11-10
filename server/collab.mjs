@@ -59,7 +59,7 @@ function taskView(db, task) {
     updatedAt: task.updated_at, revision:task.revision, dueZone:task.due_zone, assignedTo:task.assigned_to,
     members: members.map(m => ({
       id: m.id, name: m.name, email: m.email, role: m.role,
-      photoUrl: null,
+      photoUrl: m.photoVersion ? `/api/collab/tasks/${task.id}/members/${m.id}/photo?v=${m.photoVersion}` : null,
     })),
     subtasks: subtasks.map(s => ({
       id: s.id, title: s.title, done: !!s.done, status: s.done ? 'done' : (s.status==='done' ? 'todo' : s.status || 'todo'),
@@ -167,6 +167,16 @@ export function createCollabHandler({ db, findSession, origins, limit, send, env
       if(!file)return reply(res,404,{error:'File not found.'})
       res.writeHead(200,{'Content-Type':'application/octet-stream','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Disposition':`attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(file.name).replace(/'/g,'%27')}`})
       return res.end(Buffer.from(file.data,'base64'))
+    }
+    // ── GET /api/collab/tasks/:id/members/:userId/photo — only people on the same shared task can see each other's photo
+    const photoMatch = url.split('?')[0].match(/^\/api\/collab\/tasks\/([a-f0-9]{32})\/members\/([^/]+)\/photo$/)
+    if (photoMatch && method === 'GET') {
+      const inTask = id => db.prepare('SELECT 1 FROM collab_members WHERE task_id = ? AND user_id = ?').get(photoMatch[1], id)
+      if (!user || !inTask(user.id) || !inTask(photoMatch[2])) return reply(res, 403, { error: 'Access denied.' })
+      const photo = db.prepare('SELECT image FROM profile_photos WHERE user_id = ?').get(photoMatch[2])
+      if (!photo) return reply(res, 404, { error: 'No profile photo.' })
+      res.writeHead(200, { 'Content-Type': 'image/webp', 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' })
+      return res.end(Buffer.from(photo.image))
     }
     // ── GET /api/collab/tasks/:id
     const taskMatch = url.match(/^\/api\/collab\/tasks\/([a-f0-9]{32})$/)

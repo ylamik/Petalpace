@@ -155,3 +155,15 @@ test('delegated tasks keep a status, and limited members can only change their o
  result=await as(0,{subtasks:step(0,{done:false,status:undefined})});task=result.body.task
  assert.equal(task.subtasks[0].status,'todo')
 })
+test('members see each other profile photos, outsiders cannot',async t=>{
+ const f=await fixture(t);const task=await f.create();const path='/api/collab/tasks/'+task.id
+ f.db.prepare('INSERT INTO collab_members VALUES(?,?,?,?)').run(task.id,'u1','viewer',Date.now())
+ f.db.prepare('INSERT INTO profile_photos (user_id, image, version) VALUES (?, ?, ?)').run('u1',Buffer.from('webp-bytes'),'v1')
+ const view=(await f.request(path)).body.task
+ const url=view.members.find(m=>m.id==='u1').photoUrl
+ assert.equal(url,path+'/members/u1/photo?v=v1')
+ assert.equal(view.members.find(m=>m.id==='u0').photoUrl,null)
+ const photo=await f.request(url);assert.equal(photo.status,200);assert.equal(photo.body.toString(),'webp-bytes')
+ assert.equal((await f.request(url,'GET',undefined,2)).status,403)
+ assert.equal((await f.request(path+'/members/u2/photo')).status,403)
+})
