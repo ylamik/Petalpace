@@ -39,8 +39,8 @@ Secure account registration with email verification. Password reset is handled b
 ### Today
 Your daily view. Shows tasks due today, overdue unfinished tasks, and undated unfinished tasks. Pinned tasks appear in **My top 3** at the top for quick focus.
 
-<img width="956" height="471" alt="image" src="https://github.com/user-attachments/assets/291192a3-3657-49af-b54a-06fbb9b1efb1" />
-<img width="953" height="467" alt="image" src="https://github.com/user-attachments/assets/e258ab02-ffa7-4f2a-8770-41b79fc577aa" />
+<img width="959" height="470" alt="image" src="https://github.com/user-attachments/assets/4c1f6b74-7678-46d2-a11d-e5ba407417d4" />
+<img width="956" height="470" alt="image" src="https://github.com/user-attachments/assets/287b77f0-24e7-4644-81e0-ee6a66304a97" />
 
 
 - Quick-add bar to create a task in seconds
