@@ -124,6 +124,15 @@ body {
   }
 }
 
+/* Today page: petals fall once when a task is marked done. */
+.petal-burst { animation: petal-burst 1.9s ease-in forwards; opacity: 0; }
+@keyframes petal-burst {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.95; }
+  100% { transform: translate3d(var(--dx), 70vh, 0) rotate(var(--rot)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .petal-burst { display: none; } }
+
 /* Respect the user's reduced-motion setting. */
 @media (prefers-reduced-motion: reduce) {
   .petal-layer {

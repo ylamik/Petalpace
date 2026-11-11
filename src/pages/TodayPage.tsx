@@ -5,7 +5,8 @@ import { clickableCard, openFromCard } from "../features/tasks/components/cardCl
 import DeadlineLabel from '../features/tasks/components/DeadlineLabel';
 import { useSpaces, type SpaceTask as Task } from "../features/spaces/spaces";
 import { compareTasks, effectiveDue, isDeadlineOverdue } from "../features/tasks/components/taskPresentation";
-import ActivityHeatmap from "../features/tasks/components/ActivityHeatmap";
+import { NoteCard, PetalBurst, ProgressRing, WeekCard } from "../features/tasks/components/TodayExtras";
+import { useAuth } from "../features/auth/auth";
 import TaskRows from "../features/tasks/components/TaskRows";
 import TaskSpaceBadge from "../features/tasks/components/TaskSpaceBadge";
 import { useState } from "react";
@@ -64,8 +65,10 @@ function TaskBadges({ task }: { task: Task }) {
 }
 
 export default function TodayPage() {
-  const { tasks: allTasks, spaces, setTasks, notify: setNotice } = useSpaces();
+  const { tasks: allTasks, spaces, setTasks, notify: setNotice, activity } = useSpaces();
+  const { user } = useAuth();
   const clock = usePlannerClock();
+  const [petals, setPetals] = useState(0);
 
   // Today shows: tasks due today (any status), overdue unfinished tasks,
   // and undated unfinished tasks.  Completed tasks that aren't due today,
@@ -87,6 +90,19 @@ export default function TodayPage() {
   const selectedTask = allTasks.find((task) => task.id === selectedTaskId);
 
   const topTasks = allTasks.filter((task) => task.pinned && !task.done);
+
+  // Header summary: greeting, counts and today's progress.
+  const hour = clock.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const firstName = user?.name.trim().split(/\s+/)[0] ?? "";
+  const dueToday = allTasks.filter((task) => taskDaysUntil(task, clock) === 0);
+  const doneToday = dueToday.filter((task) => task.done).length;
+  const overdueCount = allTasks.filter((task) => !task.done && isDeadlineOverdue(task)).length;
+  const weekStart = new Date(clock);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+  const weekStartKey = [weekStart.getFullYear(), String(weekStart.getMonth() + 1).padStart(2, "0"), String(weekStart.getDate()).padStart(2, "0")].join("-");
+  const doneThisWeek = activity.filter((item) => item.day >= weekStartKey).reduce((sum, item) => sum + item.count, 0);
+  const celebrate = () => setPetals((n) => n + 1);
 
   const today = new Intl.DateTimeFormat("en", {
     weekday: "long",
@@ -134,43 +150,46 @@ export default function TodayPage() {
   return (
     <div className="text-dark-blue">
       {/* Greeting */}
-      <header className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="relative inline-block max-w-full pr-10 sm:pr-6">
-            <h1 className="text-2xl font-bold leading-tight xl:text-3xl">
-              Make room for what{" "}
-              {/* The underline is tied to "matters", so it stays under that word when the title wraps on small screens. */}
-              <span className="relative inline-block whitespace-nowrap">
-                matters
-                <img
-                  src="/images/yellow-line.png"
-                  alt=""
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -bottom-4 -left-1 h-6 w-[calc(100%+0.75rem)] max-w-none object-fill"
-                />
-              </span>{" "}
-              to you.
+      <header className="relative flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+        <img src="/images/leaves-flowers.png" alt="" aria-hidden="true" className="pointer-events-none absolute -right-8 -top-12 hidden w-48 rotate-6 object-contain opacity-30 md:block" />
+        <div className="relative min-w-0">
+          <div className="relative inline-block max-w-full pr-10 sm:pr-8">
+            <h1 className="text-2xl font-bold leading-tight sm:text-3xl xl:text-4xl">
+              {greeting}
+              {firstName && <>,{" "}
+                <span className="relative inline-block whitespace-nowrap">
+                  {firstName}
+                  <img
+                    src="/images/yellow-line.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -bottom-4 -left-1 h-6 w-[calc(100%+0.75rem)] max-w-none object-fill"
+                  />
+                </span>
+              </>}
             </h1>
-
             <img
               src="/images/yellow-doodle.png"
               alt=""
               aria-hidden="true"
-              className="pointer-events-none absolute -top-6 right-0 h-10 w-12 object-contain sm:-right-9 sm:-top-8 sm:h-15 sm:w-25"
+              className="pointer-events-none absolute -top-6 right-0 h-10 w-12 object-contain sm:-right-6 sm:-top-8 sm:h-14 sm:w-20"
             />
-
           </div>
 
           <div className="mt-4 flex items-center gap-3">
             <p className="text-base text-gray">{today}</p>
-
-            <img
-              src="/images/petal.png"
-              alt=""
-              aria-hidden="true"
-              className="relative -top-1 -left-1 h-5 w-8 object-contain"
-            />
+            <img src="/images/petal.png" alt="" aria-hidden="true" className="relative -top-1 -left-1 h-5 w-8 object-contain" />
           </div>
+
+          <ul aria-label="Today at a glance" className="mt-3 flex flex-wrap gap-2 text-sm font-medium">
+            {overdueCount > 0 && <li className="rounded-full bg-light-red px-3 py-1 text-red">{overdueCount} overdue</li>}
+            <li className="rounded-full bg-lightest-blue px-3 py-1">{dueToday.length - doneToday} due today</li>
+            <li className="rounded-full bg-light-green px-3 py-1 text-done-ink">{doneThisWeek} done this week</li>
+          </ul>
+        </div>
+
+        <div className="relative md:shrink-0">
+          <ProgressRing done={doneToday} total={dueToday.length} />
         </div>
       </header>
 
@@ -180,7 +199,7 @@ export default function TodayPage() {
           event.preventDefault();
           setAddTaskOpen(true);
         }}
-        className="mt-6 flex items-center gap-2 rounded-lg border border-dark-blue/25 p-2"
+        className="relative z-10 mt-6 flex items-center gap-2 rounded-lg border border-dark-blue/25 bg-surface p-2"
       >
         <span
           aria-hidden="true"
@@ -280,13 +299,20 @@ export default function TodayPage() {
               </div>
             </article>
           ))}
+          {/* Empty slots keep the three places visible and invite you to choose. */}
+          {[0, 1, 2].slice(topTasks.length).map((index) => (
+            <div
+              key={`slot-${index}`}
+              className={`relative flex min-h-16 items-center justify-center gap-2 rounded-lg border-2 border-dashed border-dark-blue/20 p-3 text-sm text-gray md:min-h-28 md:flex-col ${
+                ["bg-light-pink/60", "bg-light-yellow/60", "bg-light-green/60"][index]
+              }`}
+            >
+              <span aria-hidden="true" className="absolute right-3 top-1 font-serif text-3xl font-semibold opacity-25">{index + 1}</span>
+              <span aria-hidden="true" className="text-xl text-star">☆</span>
+              Star a task below to place it here
+            </div>
+          ))}
         </div>
-
-        {topTasks.length === 0 && (
-          <p className="mt-3 text-sm text-gray">
-            Star a task below to add it here.
-          </p>
-        )}
       </section>
 
       {/* Task list and right column */}
@@ -318,52 +344,20 @@ export default function TodayPage() {
             tasks={tasks}
             onOpen={(task) => setSelectedTaskId(task.id)}
             onPin={togglePin}
-            onStatus={(task, state) =>
+            onStatus={(task, state) => {
+              if (state.done && !task.done) celebrate();
               setTasks((current) =>
                 current.map((item) =>
                   item.id === task.id ? { ...item, ...state } : item,
                 ),
-              )
-            }
+              );
+            }}
           />
         </section>
 
         <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
-          {/* Progress heatmap */}
-          <section
-            aria-labelledby="progress-title"
-            className={`${cardShadow} bg-surface p-4`}
-          >
-            <div className="flex items-center gap-2">
-              <h2 id="progress-title" className="text-xl font-bold">
-                Your progress
-              </h2>
-              <img
-                src="/images/yellow-star.png"
-                alt=""
-                className="h-6 w-10 -ml-3 object-contain"
-              />
-            </div>
-
-            <ActivityHeatmap compact />
-            <button
-              type="button"
-              onClick={() => setProgressOpen(true)}
-              className="mt-3 text-sm text-link underline hover:decoration-2"
-            >
-              View activity
-            </button>
-            <div className="mt-6 px-3 pb-4 text-center">
-              <p className="relative mx-auto w-fit max-w-full font-story text-lg italic text-gray">
-                One step at a{' '}
-                <span className="relative inline-block whitespace-nowrap">
-                  time.
-                  <img src="/images/thin-doodle%20(1).png" alt="" aria-hidden="true" className="pointer-events-none absolute -right-4 -top-4 h-6 w-6 object-contain" />
-                </span>
-                <img src="/images/yellow-line.png" alt="" aria-hidden="true" className="pointer-events-none absolute -bottom-2 right-0 h-3 w-3/5 object-fill" />
-              </p>
-            </div>
-          </section>
+          <WeekCard activity={activity} clock={clock} onViewAll={() => setProgressOpen(true)} />
+          <NoteCard clock={clock} />
 
           {/* Upcoming */}
           <section
@@ -427,6 +421,7 @@ export default function TodayPage() {
           onCreate={createTask}
         />
       )}
+      <PetalBurst trigger={petals} />
       {progressOpen && (
         <ProgressDialog onClose={() => setProgressOpen(false)} />
       )}
@@ -435,13 +430,14 @@ export default function TodayPage() {
           key={selectedTask.id}
           task={selectedTask}
           onClose={() => setSelectedTaskId(null)}
-          onChange={(changes) =>
+          onChange={(changes) => {
+            if (changes.done && !selectedTask.done) celebrate();
             setTasks((current) =>
               current.map((task) =>
                 task.id === selectedTask.id ? { ...task, ...changes } : task,
               ),
-            )
-          }
+            );
+          }}
           onDelete={() => {
             setTasks((current) =>
               current.filter((task) => task.id !== selectedTask.id),
