@@ -67,10 +67,12 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScr
     };
   }
 
+  // On short laptop screens (under about 820px tall) everything tightens so your spaces stay visible;
+  // the whole sidebar scrolls if it still doesn't fit.
   return (
-    <aside className="flex h-auto w-full shrink-0 flex-col bg-sidebar p-4 lg:h-dvh lg:w-60">
+    <aside className="flex h-auto w-full shrink-0 flex-col bg-sidebar p-4 lg:h-dvh lg:w-60 lg:overflow-y-auto [@media(max-height:820px)]:py-3">
       {!compact && (
-        <div className="mb-5 flex shrink-0 items-center gap-2 px-2 pt-1">
+        <div className="mb-5 flex shrink-0 items-center gap-2 px-2 pt-1 [@media(max-height:820px)]:mb-3 [@media(max-height:820px)]:pt-0">
           <img src="/images/petalpace-mark.png" alt="" className="h-7 w-auto object-contain" />
           <span className="font-serif text-xl font-semibold">Petalpace</span>
         </div>
@@ -81,7 +83,7 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScr
           type="button"
           onClick={() => { onNavigate?.(); onNewTask(); }}
           aria-keyshortcuts="N"
-          className="mb-4 flex min-h-11 w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue px-4 text-[0.9375rem] font-semibold text-white shadow-[0_1px_2px_rgb(0_0_0_/_0.12)] transition-colors hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue"
+          className="mb-4 flex min-h-11 w-full shrink-0 cursor-pointer [@media(max-height:820px)]:mb-2.5 [@media(max-height:820px)]:min-h-9 items-center justify-center gap-2 rounded-xl bg-blue px-4 text-[0.9375rem] font-semibold text-white shadow-[0_1px_2px_rgb(0_0_0_/_0.12)] transition-colors hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue"
         >
           <Icon className="h-4 w-4 shrink-0"><path d="M12 5v14M5 12h14" /></Icon>
           New task
@@ -95,7 +97,7 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScr
             key={item.path}
             to={item.path}
             onClick={stayOrGo(item.path)}
-            className={({ isActive }) => `${rowBase} min-h-11 ${isActive ? "bg-nav-active font-semibold" : ""}`}
+            className={({ isActive }) => `${rowBase} min-h-11 [@media(max-height:820px)]:min-h-9 ${isActive ? "bg-nav-active font-semibold" : ""}`}
           >
             <Icon>{item.icon}</Icon>
             <span className="min-w-0 flex-1 truncate">{item.name}</span>
@@ -104,7 +106,7 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScr
         ))}
       </nav>
 
-      <div className="mt-5 flex items-center justify-between px-3">
+      <div className="mt-5 flex shrink-0 items-center justify-between px-3 [@media(max-height:820px)]:mt-3">
         <p className="text-sm font-medium text-gray">Spaces</p>
         <button
           type="button"
@@ -120,7 +122,7 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScr
         </button>
       </div>
 
-      <ul className={compact ? "mt-1 grid grid-cols-2 gap-1 sm:grid-cols-3" : "mt-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto"}>
+      <ul className={compact ? "mt-1 grid grid-cols-2 gap-1 sm:grid-cols-3" : "mt-1 min-h-28 flex-1 space-y-0.5 overflow-y-auto"}>
         {spaces.map((space) => {
           const count = open.filter((task) => task.spaceId === space.id).length;
           return (
@@ -128,7 +130,7 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScr
               <NavLink
                 to={"/spaces/" + space.id}
                 onClick={stayOrGo(`/spaces/${space.id}`)}
-                className={`flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 text-left text-[0.9375rem] focus-visible:outline-2 focus-visible:outline-blue ${compact ? "pr-20" : "group-hover:pr-20 group-focus-within:pr-20 [@media(hover:none)]:pr-20"}`}
+                className={`flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 text-left text-[0.9375rem] [@media(max-height:820px)]:min-h-8 [@media(max-height:820px)]:text-sm focus-visible:outline-2 focus-visible:outline-blue ${compact ? "pr-20" : "group-hover:pr-20 group-focus-within:pr-20 [@media(hover:none)]:pr-20"}`}
               >
                 <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: space.color }} />
                 <span className="min-w-0 flex-1 truncate" title={space.name}>{space.name}</span>
@@ -138,10 +140,10 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScr
               {/* With a mouse, edit and delete appear on hover or focus. On touch screens (phones, iPads) and in the mobile menu there is no hover, so they always show. */}
               {(
                 <span className={`absolute inset-y-0 right-1 flex items-center ${compact ? "" : "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"}`}>
-                  <button type="button" onClick={() => setEditId(space.id)} aria-label={`Edit ${space.name} space`} title={`Edit ${space.name}`} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-gray hover:text-link focus-visible:outline-blue">
+                  <button type="button" onClick={() => setEditId(space.id)} aria-label={`Edit ${space.name} space`} title={`Edit ${space.name}`} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-gray [@media(max-height:820px)]:h-8 [@media(max-height:820px)]:w-8 hover:text-link focus-visible:outline-blue">
                     <Icon className="h-3.5 w-3.5"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15v5Z" /></Icon>
                   </button>
-                  <button type="button" onClick={() => setDeleteId(space.id)} aria-label={`Delete ${space.name} space`} title={`Delete ${space.name}`} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-gray hover:text-red focus-visible:outline-blue">
+                  <button type="button" onClick={() => setDeleteId(space.id)} aria-label={`Delete ${space.name} space`} title={`Delete ${space.name}`} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-gray [@media(max-height:820px)]:h-8 [@media(max-height:820px)]:w-8 hover:text-red focus-visible:outline-blue">
                     <Icon className="h-3.5 w-3.5">{icons.bin}</Icon>
                   </button>
                 </span>
@@ -151,12 +153,12 @@ export default function Sidebar({ onNavigate, onAddSpace, compact = false, onScr
         })}
       </ul>
 
-      <div className={`mt-3 shrink-0 space-y-0.5 border-t border-dark-blue/10 pt-3 ${compact ? "grid grid-cols-2 gap-1 space-y-0" : ""}`}>
-        <button type="button" onClick={() => { onNavigate?.(); onProgress?.(); }} className={`${rowBase} min-h-10 cursor-pointer`}>
+      <div className={`mt-3 shrink-0 space-y-0.5 border-t border-dark-blue/10 pt-3 [@media(max-height:820px)]:mt-2 [@media(max-height:820px)]:pt-2 ${compact ? "grid grid-cols-2 gap-1 space-y-0" : ""}`}>
+        <button type="button" onClick={() => { onNavigate?.(); onProgress?.(); }} className={`${rowBase} min-h-10 cursor-pointer [@media(max-height:820px)]:min-h-8`}>
           <Icon>{icons.progress}</Icon>
           <span>Progress</span>
         </button>
-        <NavLink to="/bin" onClick={stayOrGo("/bin")} className={({ isActive }) => `${rowBase} min-h-10 ${isActive ? "bg-nav-active font-semibold" : ""}`}>
+        <NavLink to="/bin" onClick={stayOrGo("/bin")} className={({ isActive }) => `${rowBase} min-h-10 [@media(max-height:820px)]:min-h-8 ${isActive ? "bg-nav-active font-semibold" : ""}`}>
           <Icon>{icons.bin}</Icon>
           <span className="min-w-0 flex-1">Bin</span>
           {trash.length > 0 && <span className="text-xs text-gray">{trash.length}</span>}
